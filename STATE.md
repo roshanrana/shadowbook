@@ -4,13 +4,25 @@
 
 ## Phase
 
-**Phase 0 — Intake & requirements: COMPLETE. Approved by owner 2026-09-03.**
+**Phases 0-3: COMPLETE.** Requirements, HLD, LLD and the execution plan were all
+approved by the owner on 2026-09-03. Decisions D-001 … D-019 in
+`docs/design/decisions.md`.
 
-**Phase 1 — HLD: COMPLETE. Approved by owner 2026-09-03**, including all four §12 open questions and the full §7 stack table (D-010 … D-013).
+**Phases 4-7: IMPLEMENTED.** Guardrails, M0-M5 and M7 are done; M6's numbers and
+M6b are not. `docs/ship-report.md` is the go/no-go and is the honest account.
 
-**Phase 2 — LLD: COMPLETE. Approved by owner 2026-09-03.** Interfaces in `03-lld.md` §4 are now **FROZEN** — changing one is a plan change requiring sign-off and propagation to every affected task pack. DDL verified against PostgreSQL 16.13 (§8); two defects fixed before approval (D-015).
-
-**Phase 3 — Execution plan: DRAFTED, AWAITING OWNER APPROVAL.** `docs/design/04-execution-plan.md` plus task packs in `docs/tasks/`. **This is the hard gate: no application code may be written until the owner replies with the literal word "approved."** `docs/design/03-lld.md`. Interfaces defined there are frozen on approval: changing one afterwards is an LLD change requiring sign-off and propagation to every affected task pack.
+| Milestone | State |
+|---|---|
+| M-G guardrails | done — `make check` green in 30s, CI is a thin wrapper |
+| M0 walking skeleton | done — posting -> outbox -> consumer -> reconciled account-day |
+| M1 ledger | done — idempotency, holds, accrual, fees, EOD, four consumer modes, invariant metric |
+| M2 legacy-sim | done — twelve quirks, deterministic extracts, two windows, reachability guard |
+| M3 reconcile | done — three grains, classification, ageing, **Finding 1: 12 of 12 detected** |
+| M4 demo | done — `make demo` in ~2s, README, runbook, generated `FINDINGS.md` |
+| M5 harness | done — vegeta profiles, chaos scheduler, ablation artefacts, all tested |
+| M6 Finding 2 | **partial** — mechanism demonstrated by the consumer tests; numbers need Docker. `cmd/harness ablate` orchestration not implemented (T-048) |
+| M6b configuration D | not started — deferred by D-008 |
+| M7 hardening | done — coverage gate, security sweep, perf smoke, ship report |
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
 
@@ -30,9 +42,22 @@
 
 ## Now / next
 
-- **Now:** Phase 3 hard gate — owner approval of `docs/design/04-execution-plan.md`. **No application code until the owner replies "approved."**
-- **Next:** Phase 4 guardrails — wave 1 is T-001 alone (scaffold the LLD §1 tree), then wave 2 is T-002, T-003, T-004 in parallel. Read `.claude/skills/enterprise-dev-lifecycle/references/validation-shipping.md` (guardrails section) before starting T-002.
-- **Plan shape:** 55 tasks, 10 milestones, 19 waves. Packs for T-001…T-008 are written in full; T-009…T-055 are stubs refined at each milestone boundary. `docs/design/04-execution-plan.md` §3 is the scheduling source of truth — this file mirrors only the current wave.
+- **Now:** owner go/no-go on `docs/ship-report.md`.
+- **Next, in order of value:**
+  1. **Make the repo public-ready** (2 items, both need normal network access):
+     `scripts/pin-digests.sh` for D-017, and `go mod tidy` with `GOSUMDB` on for
+     D-016. `make security` fails on exactly these two until they are done.
+  2. **Implement the ablation orchestration** (T-048): start the ledger per
+     configuration, drive load through it, collect measurements. Everything it
+     needs — artefact schema, fixed-parameter guard, chaos scheduler, all four
+     consumer modes — is written and tested.
+  3. **Run `make ablate` on the Ryzen box** to populate Finding 2, then
+     `make report`.
+  4. **Measure NFR-1 on real hardware**: `SHADOWBOOK_PERF_RATE=2000 make perf`.
+     Not met in the build environment (~1,584/s saturated).
+  5. Configuration D (M6b), if the interview timing allows.
+- **Before an interview:** `git tag round-2`. Finding 1 alone is a complete
+  result, and the ship report says exactly what is and is not measured.
 
 ## Milestones (provisional — finalised in Phase 3)
 
@@ -51,7 +76,26 @@
 
 ## Task log
 
-_(empty — tasks are created in Phase 3)_
+One commit per wave, each naming its task IDs. `git log --oneline` is the record.
+
+| Tasks | Commit | Note |
+|---|---|---|
+| T-001…T-003 | scaffold, `make check`, CI | check green in 13s on an empty tree |
+| T-004 | compose profiles | images tag-pinned; digests need a networked machine (D-017) |
+| T-005…T-007 | money, bizdate, protobuf | money 100% cover; bizdate 98%; gen/ diff gate wired |
+| T-008 | migrations | six DDL invariants verified against live PostgreSQL 16 |
+| T-009, T-010 | store, Python calendar mirror | golden-tested over all 1096 days of 2027-2029 |
+| T-012…T-014, T-019, T-020 | HTTP API, outbox, metrics, balances, holds | |
+| T-015, T-021…T-024 | consumer modes A-D, interest, fees, EOD | ablation claims demonstrated deterministically |
+| T-027…T-034 | legacy-sim | Q10 and Q12 were undetectable as first written; both fixed |
+| T-035…T-039 | reconcile, Finding 1 | six defects fixed, each of which hid a quirk |
+| T-040…T-043 | FINDINGS renderer, `make demo`, README, runbook | |
+| T-044…T-047 | load profiles, chaos, ablation artefacts | |
+| T-048 | `make ablate` | **refuses without Docker; orchestration not implemented** |
+| T-052…T-055 | security sweep, coverage gate, perf smoke, ship report | two bugs found by writing the tests |
+
+Fourteen defects were found by running the system rather than reading it.
+`docs/ship-report.md` §7 lists them with the consequence each would have had.
 
 ## Blockers
 
@@ -65,5 +109,9 @@ _(none — B-001 resolved 2026-09-03: the full `enterprise-dev-lifecycle` skill 
 | D-017 | Compose images pinned by immutable tag, not digest | No container registry reachable | `scripts/pin-digests.sh`, one pass. **Required before the repo goes public** |
 | D-018 | ~60-line embedded migrator instead of goose (supersedes part of D-013) | goose unresolvable in the environment; also one fewer dependency for a Postgres-only, forward-only need | Contained to `migrations/migrate.go` |
 | D-019 | pgx v5.7.5, not the approved v5.10.0 | **Defect in the approved LLD**: v5.10.0 declares `go 1.25.0`, the project floor is Go 1.23+. They are incompatible | Either keep v5.7.5, or raise the Go floor to 1.25 and restore v5.10.0 |
+
+| D-018 | ~60-line embedded migrator instead of goose | see above | contained to one file |
+| — | `cmd/harness ablate` orchestration not implemented (T-048) | needs a Docker host to develop against | see `docs/ship-report.md` §4 |
+| — | NFR-1 (≥2,000 postings/s) not verified | build environment saturates at ~1,584/s | `SHADOWBOOK_PERF_RATE=2000 make perf` on the Ryzen box |
 
 None of these change a frozen §4 contract or any invariant. D-019 is the one that was a real defect in an approved document rather than an environment workaround.
