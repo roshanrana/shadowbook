@@ -71,7 +71,7 @@ Build a demonstrable digital-twin harness for core-ledger migration that produce
 | NFR-4 | Demo wall time (30 business days) | ≤ 5 min | `make demo` timing |
 | NFR-5 | Determinism | identical outputs for identical seed | `make check` golden test |
 | NFR-6 | `make check` duration | < 3 min locally; identical in CI | CI |
-| NFR-7 | Coverage | ledger ≥ 85% (posting path/invariants ≥ 95%); reconcile classification ≥ 90% | `make check` |
+| NFR-7 | Coverage | ledger ≥ 85% (posting path/invariants ≥ 95%); reconcile classification ≥ 90%; legacy-sim ≥ 85% (D-011) | `make check` |
 | NFR-8 | Offline | `make check` passes with no network | CI job with network disabled |
 | NFR-9 | Producer durability (fixed) | acks=all, RF=3, min.insync.replicas=2, unclean election off | compose config + test |
 

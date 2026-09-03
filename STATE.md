@@ -8,7 +8,7 @@
 
 **Phase 1 — HLD: COMPLETE. Approved by owner 2026-09-03**, including all four §12 open questions and the full §7 stack table (D-010 … D-013).
 
-**Phase 2 — LLD: DRAFTED, AWAITING OWNER APPROVAL.** `docs/design/03-lld.md`. Interfaces defined there are frozen on approval: changing one afterwards is an LLD change requiring sign-off and propagation to every affected task pack.
+**Phase 2 — LLD: DRAFTED, AWAITING OWNER APPROVAL.** DDL and balance query executed against PostgreSQL 16.13 (`03-lld.md` §8); two defects found and fixed before presenting. `docs/design/03-lld.md`. Interfaces defined there are frozen on approval: changing one afterwards is an LLD change requiring sign-off and propagation to every affected task pack.
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
 
