@@ -7,7 +7,7 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 ## D-001 — Go for the ledger, Python for simulator/reconciler/reporting
 
 **Status:** accepted (owner, brief §8)
-**Context:** The project targets a Go-heavy platform role; the owner's analytical tooling and existing reconciliation code (LedgerLens) are Python.
+**Context:** The project targets a Go-heavy platform context; the owner's analytical tooling and existing reconciliation code (LedgerLens) are Python.
 **Decision:** Go on the hot path and I/O edge (`ledger`, consumer, outbox relay); Python for `legacy-sim`, `reconcile`, report rendering. Protobuf contracts generated for both.
 **Consequences:** Two toolchains in `make check`. Contract drift is prevented by checked-in generated code and a CI diff check.
 
@@ -58,7 +58,7 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 **Status:** accepted (owner, Phase 0 gate, 2026-09-03)
 **Context:** Open question 4. Configurations A (at-most-once), B (naive at-least-once) and C (at-least-once + inbox) already demonstrate loss, duplication and the correct fix with its latency cost. D (Kafka transactions) adds the end-to-end-transactional comparison and carries the Redpanda-divergence risk of D-002.
 **Decision:** M6 ships Finding 2 with A, B and C. D is the first item of weekend 3 and is not a weekend-2 exit criterion.
-**Consequences:** The execution plan splits M6 into M6 (A–C, Finding 2) and M6b (D, Finding 2 extended). `make report` must render a valid table from three configurations and mark D as `not run` rather than failing. If the interview lands before M6b, `git tag round-2` captures A–C, which is a complete result on its own.
+**Consequences:** The execution plan splits M6 into M6 (A–C, Finding 2) and M6b (D, Finding 2 extended). `make report` must render a valid table from three configurations and mark D as `not run` rather than failing. If the review window lands before M6b, `git tag round-2` captures A–C, which is a complete result on its own.
 
 ## D-009 — Public repository name `shadowbook`
 
