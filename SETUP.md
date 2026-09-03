@@ -8,7 +8,7 @@ Do these in order. Thirty minutes, most of it downloads.
     # Docker + compose v2                     docker compose version
     # uv (Python 3.12+ manager)               curl -LsSf https://astral.sh/uv/install.sh | sh
     # buf (protobuf)                          https://buf.build/docs/installation
-    # k6 (load) — or vegeta; decided at HLD   https://grafana.com/docs/k6/latest/set-up/install-k6/
+    # vegeta (load) — settled at Phase 0, D-005   go install github.com/tsenart/vegeta/v12@latest
     # golangci-lint, govulncheck
     go install golang.org/x/vuln/cmd/govulncheck@latest
     # Claude Code

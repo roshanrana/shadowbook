@@ -52,9 +52,9 @@ Build a demonstrable digital-twin harness for core-ledger migration that produce
 - FR-R4 Handle late, redelivered, and truncated extracts (bad trailer) without crashing or double-counting.
 - FR-R5 No LLM in classification. Optional narrative drafting behind a flag, off by default, off in `make check`.
 
-### 3.4 harness (Python and/or k6)
+### 3.4 harness (Python and/or vegeta)
 
-- FR-H1 Open-model load generation with named profiles: steady, payday spike, month-end, hot-key (two accounts ≥ 20% of traffic).
+- FR-H1 Open-model load generation (vegeta, per D-005) with named profiles: steady, payday spike, month-end, hot-key (two accounts ≥ 20% of traffic).
 - FR-H2 Scripted chaos: kill and restart brokers on a schedule.
 - FR-H3 Ablation runner: execute configurations A–D under identical seed, profile and chaos; collect sent/applied/lost/duplicated, latency percentiles, lag, invariant status, drain time.
 - FR-H4 `make report` renders `reports/FINDINGS.md` from run artefacts. No hand edits.
@@ -65,6 +65,7 @@ Build a demonstrable digital-twin harness for core-ledger migration that produce
 | ID | Requirement | Target | Verification |
 |---|---|---|---|
 | NFR-1 | Steady-state throughput (single ledger instance, Ryzen box) | ≥ 2,000 postings/s | harness steady profile |
+| NFR-1a | Throughput during chaos runs (3-node Redpanda + 2 Postgres + harness) | ≥ 1,000 postings/s, identical across configs A–D | ablation runner (D-007) |
 | NFR-2 | p99 posting latency at steady state | ≤ 50 ms | harness |
 | NFR-3 | Invariant check lag | ≤ 1 s behind head | metric |
 | NFR-4 | Demo wall time (30 business days) | ≤ 5 min | `make demo` timing |
@@ -84,8 +85,8 @@ Build a demonstrable digital-twin harness for core-ledger migration that produce
 ## 6. Assumptions
 
 - Redpanda's Kafka transactions support is sufficient for configuration D (verify before Phase 2).
-- franz-go is the Go Kafka client (confirm at HLD).
-- Three-node Redpanda plus two Postgres plus harness fits the box; otherwise chaos runs relax throughput (open question 3).
+- franz-go is the Go Kafka client — **confirmed by owner at the Phase 0 gate** (D-006).
+- Three-node Redpanda plus two Postgres plus harness fits the box at the relaxed chaos target of NFR-1a — **resolved by owner at the Phase 0 gate** (D-007).
 
 ## 7. Out of scope
 

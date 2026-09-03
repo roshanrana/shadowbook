@@ -4,25 +4,35 @@
 
 ## Phase
 
-**Phase 0 — Intake & requirements: DRAFTED, AWAITING OWNER CONFIRMATION.**
+**Phase 0 — Intake & requirements: QUESTIONS ANSWERED, AWAITING OWNER APPROVAL OF THE REQUIREMENTS DOCUMENT.**
 
-`docs/design/01-requirements.md` has been pre-drafted from `docs/shadowbook-project-brief.md`. The Phase 0 gate is not yet passed. Next session must:
+`docs/design/01-requirements.md` was pre-drafted from `docs/shadowbook-project-brief.md` and has been updated with the owner's Phase 0 answers (D-005 … D-009). The gate is **not yet passed**: the owner answered the five open questions on 2026-09-03 but has not yet approved the requirements document itself.
 
-1. Present the requirements summary (≤10 lines) and the open questions listed below to the owner.
-2. On confirmation, mark Phase 0 complete here and begin Phase 1 (HLD) — read `.claude/skills/enterprise-dev-lifecycle/references/design-templates.md` first.
+To pass the gate, the next session must:
 
-## Open questions for the Phase 0 gate
+1. Resolve the one open requirements defect below (accrual basis).
+2. Obtain the owner's explicit approval of `01-requirements.md`.
+3. Mark Phase 0 complete here, then begin Phase 1 (HLD) — read `.claude/skills/enterprise-dev-lifecycle/references/design-templates.md` first. **That file does not exist yet** (see Blockers).
 
-1. Load generator: k6 (JS scripting, first-class open-model executors) or vegeta (Go, simpler, less scripting)? Default recommendation will be made in the HLD unless the owner has a preference.
-2. Go Kafka client: franz-go (transactions supported, actively maintained) is the working assumption. Any objection?
-3. Redpanda three-node compose for chaos runs is heavier than the box may like at 2,000 postings/s alongside two Postgres instances and the harness. Acceptable to relax the throughput target to ≥1,000/s during chaos runs, keeping ≥2,000/s for the steady-state measurement?
-4. Is Finding 2's configuration D (Kafka transactions) required for weekend 2, or acceptable as the first item of a third weekend if time is short? A, B and C alone already make the point.
-5. Public repo name: `shadowbook` confirmed?
+## Phase 0 questions — ANSWERED (owner, 2026-09-03)
+
+| # | Question | Answer | Recorded as |
+|---|---|---|---|
+| 1 | Load generator: k6 or vegeta? | **vegeta** — Go, keeps the repo to two toolchains; profiles become a custom targeter we unit-test | D-005 |
+| 2 | Go Kafka client: franz-go? | **Confirmed** | D-006 |
+| 3 | Relax chaos-run throughput to ≥1,000/s? | **Yes** — NFR-1a added; ≥2,000/s still applies to steady state | D-007 |
+| 4 | Is configuration D required for weekend 2? | **No** — A/B/C ship Finding 2 at M6; D becomes M6b, first item of weekend 3 | D-008 |
+| 5 | Public repo name `shadowbook`? | **Confirmed** — `github.com/roshanrana/shadowbook` | D-009 |
+
+## Open requirements defect (must be resolved before the gate passes)
+
+- **Accrual basis is ambiguous.** FR-L6 gives the shadow ledger ACT/365 (ACT/ACT in leap years). Q3 seeds `accrual_basis_act360_on_product` and Q6 seeds `leap_day_accrual_act365` as *legacy* quirks. If the shadow's own basis is not named unambiguously and separately from each quirk's basis, Q3 and Q6 may not actually diverge from the shadow and would show as undetectable in Finding 1. The shadow's basis, the per-product override rule, and the rounding mode must be stated once, in one place, in the HLD.
+- **Minor:** NFR-7 sets coverage targets for `ledger` and `reconcile` but none for `legacy-sim`. Propose ≥ 85% given FR-S6 (byte-identical determinism) depends on it.
 
 ## Now / next
 
-- **Now:** Phase 0 gate — owner confirmation of requirements and answers to the five questions above.
-- **Next:** Phase 1 HLD, including tech-stack recommendation (Go Kafka client, load generator, Protobuf tooling, Postgres driver, migration tool).
+- **Now:** Phase 0 gate — owner approval of `01-requirements.md`, after the accrual-basis defect above is resolved. Five questions are answered; nothing else blocks the gate.
+- **Next:** Phase 1 HLD. Stack questions still open for the HLD: Protobuf tooling (buf vs protoc), Postgres driver (pgx vs database/sql), migration tool (goose vs golang-migrate vs sqlc-adjacent), HTTP vs gRPC for FR-L1, and whether legacy-sim feeds the ledger via the API or the topic (FR-S4). The Kafka client and load generator are already settled (D-005, D-006).
 
 ## Milestones (provisional — finalised in Phase 3)
 
@@ -34,7 +44,8 @@
 | M3 | reconcile: multi-grain, classification, time-to-discovery report → **Finding 1** | Weekend 1 | not started |
 | M4 | `make demo` end to end, README two-altitude, runbook | Weekend 1 | not started |
 | M5 | harness: open-model load, hot keys, chaos schedule | Weekend 2 | not started |
-| M6 | Ablation A–D → **Finding 2**, `make report` | Weekend 2 | not started |
+| M6 | Ablation A–C → **Finding 2**, `make report` | Weekend 2 | not started |
+| M6b | Configuration D (Kafka transactions) → Finding 2 extended | Weekend 3 (D-008) | not started |
 | M7 | Hardening, security sweep, ship report, public | Weekend 2 | not started |
 | S1/S2 | Stretch (choose one) | After M7 only | not started |
 
@@ -44,7 +55,7 @@ _(empty — tasks are created in Phase 3)_
 
 ## Blockers
 
-_(none)_
+- **B-001 — `enterprise-dev-lifecycle/references/` is missing.** `.claude/skills/enterprise-dev-lifecycle/SKILL.md` is installed (copied from the account-synced skill, which ships SKILL.md only). The five reference files are absent: `design-templates.md` (needed at Phase 1 **and** Phase 2), `execution-planning.md` (Phase 3), `context-engineering.md` and `orchestration.md` (Phase 5), `validation-shipping.md` (Phases 4, 6, 7). **Blocks Phase 1.** Fix: unzip `enterprise-dev-lifecycle.zip` into that directory, then delete its README.
 
 ## Deviations from approved design
 
