@@ -4,15 +4,9 @@
 
 ## Phase
 
-**Phase 0 — Intake & requirements: QUESTIONS ANSWERED, AWAITING OWNER APPROVAL OF THE REQUIREMENTS DOCUMENT.**
+**Phase 0 — Intake & requirements: COMPLETE. Approved by owner 2026-09-03.**
 
-`docs/design/01-requirements.md` was pre-drafted from `docs/shadowbook-project-brief.md` and has been updated with the owner's Phase 0 answers (D-005 … D-009). The gate is **not yet passed**: the owner answered the five open questions on 2026-09-03 but has not yet approved the requirements document itself.
-
-To pass the gate, the next session must:
-
-1. Resolve the one open requirements defect below (accrual basis).
-2. Obtain the owner's explicit approval of `01-requirements.md`.
-3. Mark Phase 0 complete here, then begin Phase 1 (HLD) — read `.claude/skills/enterprise-dev-lifecycle/references/design-templates.md` first.
+**Phase 1 — HLD: DRAFTED, AWAITING OWNER APPROVAL.** `docs/design/02-hld.md`. The Phase 1 gate also requires the owner to confirm or override each stack recommendation in §7.
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
 
@@ -24,10 +18,11 @@ To pass the gate, the next session must:
 | 4 | Is configuration D required for weekend 2? | **No** — A/B/C ship Finding 2 at M6; D becomes M6b, first item of weekend 3 | D-008 |
 | 5 | Public repo name `shadowbook`? | **Confirmed** — `github.com/roshanrana/shadowbook` | D-009 |
 
-## Open requirements defect (must be resolved before the gate passes)
+## Carried into Phase 1
 
-- **Accrual basis is ambiguous.** FR-L6 gives the shadow ledger ACT/365 (ACT/ACT in leap years). Q3 seeds `accrual_basis_act360_on_product` and Q6 seeds `leap_day_accrual_act365` as *legacy* quirks. If the shadow's own basis is not named unambiguously and separately from each quirk's basis, Q3 and Q6 may not actually diverge from the shadow and would show as undetectable in Finding 1. The shadow's basis, the per-product override rule, and the rounding mode must be stated once, in one place, in the HLD.
-- **Minor:** NFR-7 sets coverage targets for `ledger` and `reconcile` but none for `legacy-sim`. Propose ≥ 85% given FR-S6 (byte-identical determinism) depends on it.
+- **Accrual basis — RETRACTED, not a defect.** Flagged at the Phase 0 gate, then withdrawn on reading `legacy-sim/quirks.yaml` properly: every quirk carries a `documented:` field naming the shadow's behaviour, and Q3 (`documented: ACT/365 on all products`) and Q6 (`documented: ACT/ACT in leap years`) both agree with FR-L6. The bases do diverge as designed. The HLD still states the day-count and rounding rules in one place (`02-hld.md` §5.4) because they must live in one named module, but nothing in the requirements needed changing.
+- **Real calendar defect found instead** — see `02-hld.md` §5.5 and Phase 1 open question 1. A single 30-business-day window cannot contain both Columbus Day (Q5, October) and a leap day (Q6, February); they are ~4.5 months apart. Without a fix both quirks report as undetected in Finding 1 for calendar reasons rather than reconciliation reasons.
+- **NFR-7 coverage gap:** no target for `legacy-sim`. HLD §9 proposes ≥ 85%, given FR-S6's byte-identical determinism depends on it. Confirm at the Phase 1 gate.
 
 ## Now / next
 
