@@ -76,9 +76,15 @@ func (e *Engine) Run(ctx context.Context, d bizdate.BusinessDate, now time.Time)
 		return rep, fmt.Errorf("accrual: list accounts: %w", err)
 	}
 
-	// Phase 2 -- interest, posted on the CALENDAR first of the month for the
-	// month just ended (FR-L6). Q12 posts on the first BUSINESS day instead.
-	if d.Equal(e.cal.FirstOfMonth(d.Y, d.M)) {
+	// Phase 2 -- interest for the month just ended.
+	//
+	// EOD only runs on business days, but the documented posting date is the
+	// CALENDAR first (FR-L6), which may be a weekend -- 1 April 2028 is a
+	// Saturday. So the trigger is the first business day on or after the
+	// calendar first, while the posting is DATED the calendar first. Q12 is the
+	// legacy core dating it on the trigger day instead; if this ran only when
+	// the two coincided, Q12 could never produce a break.
+	if d.Equal(e.cal.FirstBusinessDayOfMonth(d.Y, d.M)) {
 		n, total, err := e.postInterest(ctx, accounts, d)
 		if err != nil {
 			return rep, err
@@ -140,7 +146,9 @@ func InterestFor(dailyBalanceSum int64, rateBP int64, den int64) int64 {
 
 func (e *Engine) postInterest(ctx context.Context, accounts []store.Account, postOn bizdate.BusinessDate) (int, int64, error) {
 	// Interest is for the month that just ended.
-	prevMonthEnd := postOn.AddDays(-1)
+	// postOn is the trigger day; the posting is dated the calendar first.
+	calendarFirst := e.cal.FirstOfMonth(postOn.Y, postOn.M)
+	prevMonthEnd := calendarFirst.AddDays(-1)
 	first := bizdate.Date(prevMonthEnd.Y, prevMonthEnd.M, 1)
 	basis := bizdate.BasisFor(first)
 	_, den := bizdate.DayCountFraction(first, first.AddDays(1), basis)
@@ -168,7 +176,7 @@ func (e *Engine) postInterest(ctx context.Context, accounts []store.Account, pos
 		if amount == 0 {
 			continue
 		}
-		if err := e.postAgainstSuspense(ctx, a, amount, "interest", postOn,
+		if err := e.postAgainstSuspense(ctx, a, amount, "interest", calendarFirst,
 			fmt.Sprintf("interest/%s/%04d-%02d", a.ID, first.Y, int(first.M))); err != nil {
 			return count, total, err
 		}
