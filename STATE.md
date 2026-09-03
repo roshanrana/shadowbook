@@ -59,4 +59,11 @@ _(none — B-001 resolved 2026-09-03: the full `enterprise-dev-lifecycle` skill 
 
 ## Deviations from approved design
 
-_(none — nothing approved yet)_
+| # | Deviation | Why | Reverting |
+|---|---|---|---|
+| D-016 | `go.mod` clean; a **gitignored `go.work`** supplies GitHub mirrors for vanity import paths | The implementation environment's egress allowlist reaches github.com but no Go module proxy | Delete `go.work` on a networked machine. **Then run `go mod tidy` to regenerate `go.sum` with the checksum database on** — it was disabled during implementation |
+| D-017 | Compose images pinned by immutable tag, not digest | No container registry reachable | `scripts/pin-digests.sh`, one pass. **Required before the repo goes public** |
+| D-018 | ~60-line embedded migrator instead of goose (supersedes part of D-013) | goose unresolvable in the environment; also one fewer dependency for a Postgres-only, forward-only need | Contained to `migrations/migrate.go` |
+| D-019 | pgx v5.7.5, not the approved v5.10.0 | **Defect in the approved LLD**: v5.10.0 declares `go 1.25.0`, the project floor is Go 1.23+. They are incompatible | Either keep v5.7.5, or raise the Go floor to 1.25 and restore v5.10.0 |
+
+None of these change a frozen §4 contract or any invariant. D-019 is the one that was a real defect in an approved document rather than an environment workaround.

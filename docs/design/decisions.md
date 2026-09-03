@@ -108,3 +108,31 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 **Context:** The LLD's schema is the implementation contract for M0 and M1. Schema defects found in Phase 4 cost a whole session under the two-strike rule.
 **Decision:** SQL in `03-lld.md` is executed against a real PostgreSQL 16 instance and its invariants exercised before the document is presented for approval. Recorded in `03-lld.md` §8.
 **Consequences:** Two defects were caught this way — `entries.entry_id` typed `BIGGSERIAL`, and a balance query missing its mandatory `GROUP BY` that also returned no row for an account with no checkpoint. The same practice applies to any future DDL change: it is executed before it is approved, not after it fails.
+
+## D-016 — A local-only `go.work` supplies GitHub mirrors for vanity import paths
+
+**Status:** accepted (implementation, 2026-09-03)
+**Context:** The build environment used for the initial implementation reaches `github.com`, PyPI and npm, but not `proxy.golang.org`, `golang.org`, `gopkg.in` or `google.golang.org`, and no Go module proxy is reachable. Vanity import paths therefore cannot be resolved there. Putting `replace` directives in `go.mod` would ship a repository that is wrong for any normal machine.
+**Decision:** `go.mod` stays clean and correct — real vanity paths, real versions. A **gitignored `go.work`** carries eleven `replace` directives mapping each vanity path to its GitHub mirror at the same version. Sums land in `go.work.sum`, also gitignored, so `go.sum` is never polluted.
+**Consequences:** On a machine with normal network access, delete `go.work`; nothing else changes. `go get` does **not** honour workspace replaces, so dependencies added in that environment must be written into `go.mod` with `go mod edit -require` and resolved by `go build`. `go.sum` must be regenerated once on a networked machine (`go mod tidy`), and the checksum database re-verified — it was disabled (`GOSUMDB=off`) in the restricted environment, which is a real reduction in supply-chain verification and is why the regeneration is not optional.
+
+## D-017 — Compose images pinned by tag, with a script to convert to digests
+
+**Status:** accepted (implementation, 2026-09-03)
+**Context:** T-004 requires every image pinned by digest. No container registry is reachable from the build environment, so digests cannot be resolved there.
+**Decision:** Images are pinned to immutable patch tags (`postgres:16.13-bookworm`, `redpandadata/redpanda:v24.3.6`, `prom/prometheus:v3.1.0`) and `scripts/pin-digests.sh` resolves and rewrites them in one pass on a machine with registry access.
+**Consequences:** Running that script is a **prerequisite for the public repo** and is listed in the ship report. Until it runs, a tag could in principle be re-pushed; patch tags make that unlikely but not impossible.
+
+## D-018 — A ~60-line embedded migrator replaces goose
+
+**Status:** accepted (implementation, 2026-09-03) — **supersedes the goose half of D-013**
+**Context:** goose could not be resolved in the build environment (its dependency graph reaches `go.uber.org`, and `go get` ignores the D-016 workspace replaces). Beyond that constraint: SHADOWBOOK needs "apply numbered embedded SQL files in order, record versions, forward-only, Postgres only", while goose carries drivers for many databases that this project will never use.
+**Decision:** `migrations/migrate.go` — `Load` and `Apply` over an `embed.FS`, each migration in its own transaction, versions recorded in `schema_migrations`, re-running a no-op, and a gap in the version sequence is an error.
+**Consequences:** Everything the LLD actually specified is unchanged — plain SQL, numbered `NNNN_slug.sql`, forward-only, embedded, applied at start-up. One fewer dependency in a project whose stated value is a small deterministic surface. **Honest caveat:** the proximate cause was an environment limitation, not a design insight; goose remains a defensible choice and reverting is a contained change to one file. Revert if the project ever needs multi-database support or goose's `--no-versioning` fixture mode.
+
+## D-019 — pgx pinned to v5.7.5, not v5.10.0: the approved LLD version was incompatible
+
+**Status:** accepted (implementation, 2026-09-03) — **corrects D-013**
+**Context:** D-013 and LLD §7.2 pinned `jackc/pgx` v5.10.0, verified as the latest release on 2026-09-03. Building against it revealed that **v5.10.0 declares `go 1.25.0`**, while the project's own constraint (requirements §5, CLAUDE.md, SETUP.md) is **Go 1.23+**. The two cannot both hold: a machine with Go 1.23 or 1.24 cannot build the approved dependency set.
+**Decision:** Pin pgx v5.7.5, which builds on Go 1.23+. The typed `*pgconn.PgError` carrying SQLSTATE and `ConstraintName` — the whole reason D-013 chose pgx — is present and verified working in v5.7.5.
+**Consequences:** This was a defect in an approved document, found only by building. The alternative is to raise the project's Go floor to 1.25 and keep v5.10.0; that is a one-line change to `go.mod` and SETUP.md if the owner prefers it. Recommend staying on 1.23+ for now: nothing in the project needs a Go 1.25 feature, and a lower floor is one less thing for a reviewer to install.
