@@ -1,6 +1,6 @@
 # High-Level Design — SHADOWBOOK
 
-Status: draft
+Status: **approved 2026-09-03**
 Requirements: `docs/design/01-requirements.md` · Decisions: `docs/design/decisions.md`
 
 ## 1. Overview

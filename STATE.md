@@ -6,7 +6,9 @@
 
 **Phase 0 — Intake & requirements: COMPLETE. Approved by owner 2026-09-03.**
 
-**Phase 1 — HLD: DRAFTED, AWAITING OWNER APPROVAL.** `docs/design/02-hld.md`. The Phase 1 gate also requires the owner to confirm or override each stack recommendation in §7.
+**Phase 1 — HLD: COMPLETE. Approved by owner 2026-09-03**, including all four §12 open questions and the full §7 stack table (D-010 … D-013).
+
+**Phase 2 — LLD: DRAFTED, AWAITING OWNER APPROVAL.** `docs/design/03-lld.md`. Interfaces defined there are frozen on approval: changing one afterwards is an LLD change requiring sign-off and propagation to every affected task pack.
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
 
@@ -22,7 +24,7 @@
 
 - **Accrual basis — RETRACTED, not a defect.** Flagged at the Phase 0 gate, then withdrawn on reading `legacy-sim/quirks.yaml` properly: every quirk carries a `documented:` field naming the shadow's behaviour, and Q3 (`documented: ACT/365 on all products`) and Q6 (`documented: ACT/ACT in leap years`) both agree with FR-L6. The bases do diverge as designed. The HLD still states the day-count and rounding rules in one place (`02-hld.md` §5.4) because they must live in one named module, but nothing in the requirements needed changing.
 - **Real calendar defect found instead** — see `02-hld.md` §5.5 and Phase 1 open question 1. A single 30-business-day window cannot contain both Columbus Day (Q5, October) and a leap day (Q6, February); they are ~4.5 months apart. Without a fix both quirks report as undetected in Finding 1 for calendar reasons rather than reconciliation reasons.
-- **NFR-7 coverage gap:** no target for `legacy-sim`. HLD §9 proposes ≥ 85%, given FR-S6's byte-identical determinism depends on it. Confirm at the Phase 1 gate.
+- **NFR-7 coverage gap:** RESOLVED — `legacy-sim` ≥ 85% adopted at the Phase 1 gate (D-011).
 
 ## Now / next
 

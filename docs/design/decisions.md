@@ -66,3 +66,31 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 **Context:** Open question 5.
 **Decision:** `github.com/roshanrana/shadowbook`. Go module path follows.
 **Consequences:** Module path is fixed before any Go code exists, so no rename churn.
+
+## D-010 — Two demo windows, anchored 2028-02-28 and 2028-10-02
+
+**Status:** accepted (owner, Phase 1 gate, 2026-09-03)
+**Context:** Quirk cadences are calendar-gated. A 30-business-day window is ~6 calendar weeks and cannot contain both Columbus Day (Q5, October) and a leap day (Q6, February) — they are ~4.5 months apart. Anchoring naively on Feb 29 2028 also puts the month boundary on Wednesday 1 March 2028, where the calendar first *is* the first business day, so Q12 could not fire either. Left unfixed, Finding 1 reports false negatives that look like reconciliation failures.
+**Decision:** `make demo` runs two windows. W1 `leap-and-month-end` = 2028-02-28 → 2028-04-07 (verified: exactly 30 business days; contains Feb 29; contains month ends Feb 29 and Mar 31; 1 April 2028 is a Saturday so Q12 diverges; nearest federal holiday Presidents Day 2028-02-21 falls outside). W2 `columbus` = 2028-10-02 → 2028-10-13 (9 business days — Columbus Day 2028-10-09 is excluded from its own window by the documented calendar, which is the point). Finding 1 gains a `window` column.
+**Consequences:** A test asserts every quirk in `quirks.yaml` is reachable by at least one configured window before a run may render, so this defect cannot silently return. `quirks.yaml` is unchanged — the alternative, redefining Q5 to a holiday inside W1, was rejected as a quirk redefinition. HLD §5.5.
+
+## D-011 — `legacy-sim` coverage target ≥ 85%
+
+**Status:** accepted (owner, Phase 1 gate, 2026-09-03)
+**Context:** NFR-7 set coverage targets for `ledger` and `reconcile` but none for `legacy-sim`, whose FR-S6 byte-identical determinism the whole of Finding 1 rests on.
+**Decision:** `legacy-sim` ≥ 85% lines, enforced in `make check`.
+**Consequences:** NFR-7 amended in `01-requirements.md` at Phase 2.
+
+## D-012 — legacy-sim reaches the ledger over both HTTP and the topic
+
+**Status:** accepted (owner, Phase 1 gate, 2026-09-03)
+**Context:** FR-S4 left the ingress path open. Finding 1 wants the replay path a real migration would use and something a reviewer can reproduce with `curl`; Finding 2 is *about* the consumer, so postings must cross the broker for loss and duplication to mean anything.
+**Decision:** Both. HTTP `POST /postings` with an idempotency key drives `make demo` and Finding 1; the movement topic drives `make ablate` and Finding 2. Both land in one posting service behind a single interface.
+**Consequences:** A contract test asserts identical entries, balances and outbox rows for the same input through either path (HLD risk R6). Two ingress paths are a real cost; the test is the control.
+
+## D-013 — Stack: net/http, pgx v5, goose, buf, client_golang, stdlib data handling, Jinja2
+
+**Status:** accepted (owner, Phase 1 gate, 2026-09-03)
+**Context:** HLD §7, with registry versions verified 2026-09-03.
+**Decision:** HTTP/JSON on `net/http` + stdlib mux (gRPC rejected: vegeta drives HTTP, so it would undo D-005); `jackc/pgx` v5.10.0 (typed `*pgconn.PgError` is what makes idempotency-by-constraint real); `pressly/goose` v3.28.0 with embedded plain SQL (invariants live in reviewable DDL); `buf` with generated code checked in (`buf breaking` guards the frozen contract, and check-in keeps NFR-8 offline); `prometheus/client_golang`; **no pandas or polars in `reconcile`** — stdlib `csv`/`dataclasses`/`decimal` with explicit sort keys, because deterministic ordering (NFR-5) beats speed we do not need; Jinja2 for report rendering.
+**Consequences:** Two toolchains, few dependencies, everything mypy- and vet-checkable. Any later wish for a dataframe library in `reconcile` is a decision to re-open here, not a mid-task convenience.
