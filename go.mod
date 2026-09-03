@@ -9,7 +9,9 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jackc/puddle/v2 v2.2.2
 	github.com/prometheus/client_golang v1.20.5
+	github.com/tsenart/vegeta/v12 v12.12.0
 	golang.org/x/crypto v0.31.0
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/sync v0.10.0
 	golang.org/x/text v0.21.0
 	google.golang.org/protobuf v1.36.5
