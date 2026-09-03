@@ -1,6 +1,6 @@
 # Execution Plan — SHADOWBOOK
 
-Status: draft
+Status: **approved 2026-09-03**; implemented through M7 — see `../ship-report.md`
 LLD: `docs/design/03-lld.md` (approved 2026-09-03, interfaces frozen) · Decisions: `docs/design/decisions.md`
 
 > **Hard gate.** No application code is written until the owner replies "approved" to this plan (`enterprise-dev-lifecycle` rule 1).
@@ -35,61 +35,61 @@ Scheduling source of truth. `STATE.md` mirrors only the current wave.
 
 | ID | Title | M | Wave | Depends on | Size | Status |
 |---|---|---|---|---|---|---|
-| T-001 | Scaffold repository layout per LLD §1 | M-G | 1 | — | M | todo |
-| T-002 | Toolchain config and the single `make check` | M-G | 2 | T-001 | M | todo |
-| T-003 | CI workflow as a thin wrapper around `make check` | M-G | 2 | T-001 | S | todo |
-| T-004 | Compose profiles, pinned images, Prometheus scrape | M-G | 2 | T-001 | M | todo |
-| T-005 | `internal/money` — Amount, currency registry, scale | M0 | 3 | T-002 | S | todo |
-| T-006 | `internal/bizdate` — calendar, cut-off, day count, rounding | M0 | 3 | T-002 | M | todo |
-| T-007 | Protobuf contracts, buf config, generated code checked in | M0 | 3 | T-002 | M | todo |
-| T-008 | Ledger migrations 0001–0006 with DDL invariants | M0 | 3 | T-002 | M | todo |
-| T-009 | `internal/ledger/store` — pgx pool, goose embed, queries | M0 | 4 | T-005, T-008 | M | todo |
-| T-010 | `legacy_sim.calendar` mirror + golden test vs bizdate | M0 | 4 | T-006 | S | todo |
-| T-011 | Posting service: idempotency by constraint, zero-sum | M0 | 5 | T-009 | L | todo |
-| T-012 | HTTP API handlers and error taxonomy | M0 | 6 | T-011 | M | todo |
-| T-013 | Outbox relay to Redpanda | M0 | 5 | T-009, T-007 | M | todo |
-| T-014 | Metrics and the global-invariant checker | M0 | 5 | T-009 | M | todo |
-| T-015 | Consumer, mode C only (inbox dedup) | M0 | 6 | T-013 | M | todo |
-| T-016 | legacy-sim minimal: one account, one day, one TXN extract | M0 | 7 | T-010, T-012 | M | todo |
-| T-017 | reconcile minimal: ingest, account-day grain, one findings row | M0 | 8 | T-016 | M | todo |
-| T-018 | M0 end-to-end walking-skeleton test | M0 | 9 | T-014, T-015, T-017 | M | todo |
-| T-019 | Derived balances and checkpoints | M1 | 10 | T-018 | M | todo |
-| T-020 | Holds: place, release, 72-hour expiry | M1 | 11 | T-019 | M | todo |
-| T-021 | Interest accrual: ACT/365, ACT/ACT, half-even | M1 | 11 | T-019, T-006 | M | todo |
-| T-022 | Fees: monthly fee and minimum-balance fee on available | M1 | 12 | T-020 | M | todo |
-| T-023 | EOD orchestration, ordering, replay idempotence | M1 | 13 | T-021, T-022 | M | todo |
-| T-024 | Consumer modes A, B and D | M1 | 10 | T-015 | L | todo |
-| T-025 | Graceful shutdown and cancellation audit | M1 | 11 | T-024 | S | todo |
-| T-026 | Named ledger scenarios: idempotency race, out-of-order | M1 | 14 | T-023 | M | todo |
-| T-027 | legacy-sim generator: accounts, products, currencies | M2 | 10 | T-016 | M | todo |
-| T-028 | Quirks Q1–Q4 | M2 | 11 | T-027 | M | todo |
-| T-029 | Quirks Q5–Q8 | M2 | 11 | T-027 | M | todo |
-| T-030 | Quirks Q9–Q12 | M2 | 11 | T-027 | M | todo |
-| T-031 | Extract writer: TXN and BAL, trailer control totals | M2 | 11 | T-027 | M | todo |
-| T-032 | Dual ingress (HTTP + topic) and the equivalence contract test | M2 | 12 | T-031, T-013 | M | todo |
-| T-033 | Determinism golden test over W1 and W2 extracts | M2 | 12 | T-028, T-029, T-030, T-031 | S | todo |
-| T-034 | Window config and the quirk-reachability guard | M2 | 13 | T-033 | S | todo |
-| T-035 | reconcile ingest: trailer, late, redelivered, truncated | M3 | 12 | T-017 | M | todo |
-| T-036 | Three grain comparators | M3 | 13 | T-035 | M | todo |
-| T-037 | Classification rules and the model-rule table | M3 | 14 | T-036 | L | todo |
-| T-038 | Break ageing, closure and history | M3 | 14 | T-036 | M | todo |
-| T-039 | Quirk attribution and time-to-discovery metrics | M3 | 15 | T-037, T-038, T-034 | L | todo |
-| T-040 | Finding 1 rendering into the FINDINGS template | M3 | 16 | T-039 | M | todo |
-| T-041 | `make demo`: both windows, end to end, under five minutes | M4 | 17 | T-040, T-023 | M | todo |
-| T-042 | README two-altitude refresh and scenario→test map | M4 | 18 | T-041 | S | todo |
-| T-043 | Runbook | M4 | 18 | T-041 | S | todo |
-| T-044 | vegeta pacers and targeters for four profiles | M5 | 10 | T-012 | M | todo |
-| T-045 | Chaos scheduler: scripted broker kill and restart | M5 | 10 | T-004 | M | todo |
-| T-046 | Ablation runner and run artefacts | M5 | 11 | T-044, T-045, T-024 | L | todo |
-| T-047 | Loss and duplication measurement, drain logic | M6 | 14 | T-046 | M | todo |
-| T-048 | `make ablate` for A–C, three runs each | M6 | 15 | T-047 | M | todo |
-| T-049 | Finding 2 rendering with the fixed-parameter guard | M6 | 16 | T-048 | M | todo |
-| T-050 | `make report` determinism test | M6 | 17 | T-049, T-040 | S | todo |
-| T-051 | Configuration D against Redpanda, with go/no-go | M6b | 18 | T-049 | L | todo |
-| T-052 | Security sweep: govulncheck, pip-audit, secrets scan | M7 | 18 | T-050 | M | todo |
-| T-053 | Coverage enforcement to NFR-7 targets | M7 | 18 | T-050 | M | todo |
-| T-054 | Performance smoke against NFR-1 and NFR-2 | M7 | 18 | T-050 | M | todo |
-| T-055 | Ship report and public-repo readiness | M7 | 19 | T-052, T-053, T-054 | M | todo |
+| T-001 | Scaffold repository layout per LLD §1 | M-G | 1 | — | M | done |
+| T-002 | Toolchain config and the single `make check` | M-G | 2 | T-001 | M | done |
+| T-003 | CI workflow as a thin wrapper around `make check` | M-G | 2 | T-001 | S | done |
+| T-004 | Compose profiles, pinned images, Prometheus scrape | M-G | 2 | T-001 | M | done |
+| T-005 | `internal/money` — Amount, currency registry, scale | M0 | 3 | T-002 | S | done |
+| T-006 | `internal/bizdate` — calendar, cut-off, day count, rounding | M0 | 3 | T-002 | M | done |
+| T-007 | Protobuf contracts, buf config, generated code checked in | M0 | 3 | T-002 | M | done |
+| T-008 | Ledger migrations 0001–0006 with DDL invariants | M0 | 3 | T-002 | M | done |
+| T-009 | `internal/ledger/store` — pgx pool, goose embed, queries | M0 | 4 | T-005, T-008 | M | done |
+| T-010 | `legacy_sim.calendar` mirror + golden test vs bizdate | M0 | 4 | T-006 | S | done |
+| T-011 | Posting service: idempotency by constraint, zero-sum | M0 | 5 | T-009 | L | done |
+| T-012 | HTTP API handlers and error taxonomy | M0 | 6 | T-011 | M | done |
+| T-013 | Outbox relay to Redpanda | M0 | 5 | T-009, T-007 | M | done |
+| T-014 | Metrics and the global-invariant checker | M0 | 5 | T-009 | M | done |
+| T-015 | Consumer, mode C only (inbox dedup) | M0 | 6 | T-013 | M | done |
+| T-016 | legacy-sim minimal: one account, one day, one TXN extract | M0 | 7 | T-010, T-012 | M | done |
+| T-017 | reconcile minimal: ingest, account-day grain, one findings row | M0 | 8 | T-016 | M | done |
+| T-018 | M0 end-to-end walking-skeleton test | M0 | 9 | T-014, T-015, T-017 | M | done |
+| T-019 | Derived balances and checkpoints | M1 | 10 | T-018 | M | done |
+| T-020 | Holds: place, release, 72-hour expiry | M1 | 11 | T-019 | M | done |
+| T-021 | Interest accrual: ACT/365, ACT/ACT, half-even | M1 | 11 | T-019, T-006 | M | done |
+| T-022 | Fees: monthly fee and minimum-balance fee on available | M1 | 12 | T-020 | M | done |
+| T-023 | EOD orchestration, ordering, replay idempotence | M1 | 13 | T-021, T-022 | M | done |
+| T-024 | Consumer modes A, B and D | M1 | 10 | T-015 | L | done |
+| T-025 | Graceful shutdown and cancellation audit | M1 | 11 | T-024 | S | done |
+| T-026 | Named ledger scenarios: idempotency race, out-of-order | M1 | 14 | T-023 | M | done |
+| T-027 | legacy-sim generator: accounts, products, currencies | M2 | 10 | T-016 | M | done |
+| T-028 | Quirks Q1–Q4 | M2 | 11 | T-027 | M | done |
+| T-029 | Quirks Q5–Q8 | M2 | 11 | T-027 | M | done |
+| T-030 | Quirks Q9–Q12 | M2 | 11 | T-027 | M | done |
+| T-031 | Extract writer: TXN and BAL, trailer control totals | M2 | 11 | T-027 | M | done |
+| T-032 | Dual ingress (HTTP + topic) and the equivalence contract test | M2 | 12 | T-031, T-013 | M | done |
+| T-033 | Determinism golden test over W1 and W2 extracts | M2 | 12 | T-028, T-029, T-030, T-031 | S | done |
+| T-034 | Window config and the quirk-reachability guard | M2 | 13 | T-033 | S | done |
+| T-035 | reconcile ingest: trailer, late, redelivered, truncated | M3 | 12 | T-017 | M | done |
+| T-036 | Three grain comparators | M3 | 13 | T-035 | M | done |
+| T-037 | Classification rules and the model-rule table | M3 | 14 | T-036 | L | done |
+| T-038 | Break ageing, closure and history | M3 | 14 | T-036 | M | done |
+| T-039 | Quirk attribution and time-to-discovery metrics | M3 | 15 | T-037, T-038, T-034 | L | done |
+| T-040 | Finding 1 rendering into the FINDINGS template | M3 | 16 | T-039 | M | done |
+| T-041 | `make demo`: both windows, end to end, under five minutes | M4 | 17 | T-040, T-023 | M | done |
+| T-042 | README two-altitude refresh and scenario→test map | M4 | 18 | T-041 | S | done |
+| T-043 | Runbook | M4 | 18 | T-041 | S | done |
+| T-044 | vegeta pacers and targeters for four profiles | M5 | 10 | T-012 | M | done |
+| T-045 | Chaos scheduler: scripted broker kill and restart | M5 | 10 | T-004 | M | done |
+| T-046 | Ablation runner and run artefacts | M5 | 11 | T-044, T-045, T-024 | L | done |
+| T-047 | Loss and duplication measurement, drain logic | M6 | 14 | T-046 | M | done |
+| T-048 | `make ablate` for A–C, three runs each | M6 | 15 | T-047 | M | partial |
+| T-049 | Finding 2 rendering with the fixed-parameter guard | M6 | 16 | T-048 | M | not started |
+| T-050 | `make report` determinism test | M6 | 17 | T-049, T-040 | S | not started |
+| T-051 | Configuration D against Redpanda, with go/no-go | M6b | 18 | T-049 | L | not started |
+| T-052 | Security sweep: govulncheck, pip-audit, secrets scan | M7 | 18 | T-050 | M | done |
+| T-053 | Coverage enforcement to NFR-7 targets | M7 | 18 | T-050 | M | done |
+| T-054 | Performance smoke against NFR-1 and NFR-2 | M7 | 18 | T-050 | M | done |
+| T-055 | Ship report and public-repo readiness | M7 | 19 | T-052, T-053, T-054 | M | done |
 
 ## 4. Dependency notes
 

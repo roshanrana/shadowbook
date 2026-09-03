@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Git SHA | `136e6f46acae5e44f853d90b6c07db4a7f2293dc` |
+| Git SHA | `4324066de0259c0da97bd42530e4e745e6c661f1` |
 | Seed | `20260903` |
 | Windows | W1, W2 |
 | Broker | Redpanda (not exercised in this run) |
@@ -123,7 +123,7 @@ and are not claimed here.
 ## Reproduce
 
 ```
-git checkout 136e6f46acae5e44f853d90b6c07db4a7f2293dc
+git checkout 4324066de0259c0da97bd42530e4e745e6c661f1
 cp .env.example .env
 make up
 make demo          # both windows, Finding 1
