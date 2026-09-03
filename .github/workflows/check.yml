@@ -1,21 +1,78 @@
+# CI is a thin wrapper around `make check` (CLAUDE.md). Every verification step
+# below is one a developer can run locally with the same command; nothing here
+# lints, types or tests differently from the local gate.
 name: check
+
 on:
   push:
     branches: [main]
   pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   check:
+    runs-on: ubuntu-latest
+    services:
+      ledger-db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shadowbook
+          POSTGRES_PASSWORD: shadowbook
+          POSTGRES_DB: ledger
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U shadowbook"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      recon-db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shadowbook
+          POSTGRES_PASSWORD: shadowbook
+          POSTGRES_DB: recon
+        ports: ["5434:5432"]
+        options: >-
+          --health-cmd "pg_isready -U shadowbook"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Go version comes from go.mod, so it is stated in exactly one place.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.5.0
+          install-mode: binary
+          args: --version
+
+      - name: make check
+        run: make check
+
+  # NFR-8: `make check` must pass with no network. Generated protobuf code is
+  # checked in and migrations are embedded precisely so this holds.
+  offline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
-      - uses: astral-sh/setup-uv@v3
-      - name: Start single-node infra
-        run: docker compose --profile single up -d --wait
-      - name: make check
-        run: make check
-      - name: Teardown
-        if: always()
-        run: docker compose --profile single down -v
+          go-version-file: go.mod
+          cache: true
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: warm caches, then cut the network
+        run: |
+          go mod download
+          uv sync --frozen
+      - name: make check with networking disabled
+        run: sudo unshare -n --map-root-user make check LEDGER_DSN= RECON_DSN=

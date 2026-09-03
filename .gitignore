@@ -8,3 +8,13 @@ __pycache__/
 bin/
 coverage.out
 .DS_Store
+
+# Go workspace: local-only. See docs/design/decisions.md D-016.
+go.work
+go.work.sum
+.venv/
+uv.lock.local
+gen/**/__pycache__/
+*.test
+coverage.xml
+.coverage
