@@ -1,4 +1,6 @@
 line-length = 100
+# Generated code is checked in (D-013) but is not ours to style.
+extend-exclude = ["gen", ".venv"]
 target-version = "py312"
 src = ["legacy-sim/src", "reconcile/src", "report/src"]
 

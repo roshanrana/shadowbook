@@ -17,7 +17,7 @@ help: ## List targets
 
 ## ---------------------------------------------------------------- the gate
 
-check: fmt-check lint typecheck test-unit test-integration test-race ## THE definition of done.
+check: fmt-check lint typecheck gen-check test-unit test-integration test-race ## THE definition of done.
 	@echo "make check: PASS"
 
 fmt-check: ## gofmt + ruff format, non-mutating
@@ -80,8 +80,15 @@ ablate: ## Ablation A-C (D at M6b). Artefacts to reports/runs/.
 report: ## Render reports/FINDINGS.md from run artefacts. Deterministic.
 	@echo "make report: not wired yet (M6). See STATE.md." && exit 1
 
-proto: ## Regenerate Go and Python from contracts/.
-	@echo "make proto: not wired yet (T-007)." && exit 1
+proto: ## Regenerate Go and Python from contracts/. Output is committed.
+	@cd contracts && protoc --go_out=../gen/go --go_opt=paths=source_relative \
+		--python_out=../gen/python --pyi_out=../gen/python \
+		-I . $$(find . -name '*.proto' | sort)
+	@echo "make proto: regenerated. Commit gen/ if it changed."
 
-.PHONY: help check fmt fmt-check lint typecheck test-unit test-integration test-race \
+gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
+	@if command -v protoc >/dev/null; then scripts/check-gen-diff.sh; \
+	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
+
+.PHONY: help check fmt fmt-check lint typecheck gen-check test-unit test-integration test-race \
         coverage demo up up-chaos down ablate report proto

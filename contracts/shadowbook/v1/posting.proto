@@ -1,0 +1,36 @@
+// Frozen contract. LLD §4.1. Changing a field here is an LLD change: update
+// 03-lld.md, list every affected task pack, get sign-off, then propagate.
+// `buf breaking` guards this in CI.
+syntax = "proto3";
+
+package shadowbook.v1;
+
+option go_package = "github.com/roshanrana/shadowbook/gen/go/shadowbook/v1;shadowbookv1";
+
+// Money mirrors internal/money.Amount exactly: integer minor units, an explicit
+// ISO 4217 currency, and a scale that the ledger owns. Never a float, on the
+// wire or off it (FR-L11).
+message Money {
+  int64 minor = 1;
+  string currency = 2;
+  uint32 scale = 3;
+}
+
+message Entry {
+  int64 entry_id = 1;
+  string account_id = 2;
+  Money amount = 3;
+}
+
+// Emitted by the ledger's transactional outbox, one per committed posting,
+// keyed by account_id on the topic (FR-L7).
+message PostingEvent {
+  string posting_id = 1;
+  string principal = 2;
+  string kind = 3;
+  string business_date = 4;  // YYYY-MM-DD
+  string value_date = 5;     // YYYY-MM-DD
+  string posted_at = 6;      // RFC3339 UTC
+  repeated Entry entries = 7;
+  string reverses_posting_id = 8;
+}

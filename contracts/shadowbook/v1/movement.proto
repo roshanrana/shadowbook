@@ -1,0 +1,23 @@
+// Frozen contract. LLD §4.1.
+syntax = "proto3";
+
+package shadowbook.v1;
+
+option go_package = "github.com/roshanrana/shadowbook/gen/go/shadowbook/v1;shadowbookv1";
+
+import "shadowbook/v1/posting.proto";
+
+// Consumed by the ledger from legacy-sim on the ablation path (FR-L8, D-012).
+//
+// message_id is an IDENTITY, not a hint: it is the PRIMARY KEY of the inbox
+// table, and configuration C's exactly-once property is a unique-constraint
+// violation on it (LLD §3.3, §3.7).
+message MovementEvent {
+  string message_id = 1;
+  string account_id = 2;
+  Money amount = 3;
+  string business_date = 4;
+  string value_date = 5;
+  string posted_at = 6;
+  string kind = 7;
+}
