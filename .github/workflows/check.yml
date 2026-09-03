@@ -18,8 +18,11 @@ jobs:
       ledger-db:
         image: postgres:16
         env:
+          # Trust auth, not a password: the container is ephemeral, reachable
+          # only from this job, and a checked-in password -- however harmless --
+          # is exactly what the security sweep should refuse to normalise.
           POSTGRES_USER: shadowbook
-          POSTGRES_PASSWORD: shadowbook
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: ledger
         ports: ["5433:5432"]
         options: >-
@@ -29,7 +32,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: shadowbook
-          POSTGRES_PASSWORD: shadowbook
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: recon
         ports: ["5434:5432"]
         options: >-
@@ -56,6 +59,12 @@ jobs:
 
       - name: make check
         run: make check
+
+      - name: coverage gate (NFR-7)
+        run: make coverage
+
+      - name: security sweep (non-blocking until the repo is public)
+        run: make security || true
 
   # NFR-8: `make check` must pass with no network. Generated protobuf code is
   # checked in and migrations are embedded precisely so this holds.

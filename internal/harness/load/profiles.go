@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -163,12 +164,20 @@ func TargeterFor(o Options) (vegeta.Targeter, error) {
 	suspense := o.Accounts[len(o.Accounts)-1]
 	hot := o.Accounts[:2]
 
-	var n uint64
+	// vegeta calls a Targeter from EVERY worker goroutine concurrently, so the
+	// sequence number must be taken atomically and then used as a local value.
+	//
+	// A plain n++ followed by reads of n is not merely racy in the abstract: a
+	// request could take its idempotency key from one sequence number and its
+	// amount from another, producing the same key with a DIFFERENT body. The
+	// ledger correctly answered 409 IdempotencyBodyMismatch, and the load test
+	// looked like a ledger fault when it was a generator fault.
+	var counter atomic.Uint64
 	return func(t *vegeta.Target) error {
 		if t == nil {
 			return vegeta.ErrNilTarget
 		}
-		n++
+		n := counter.Add(1)
 		account := selectAccount(o, hot, n)
 		// The modulus bounds this well inside int64, but make the narrowing
 		// explicit rather than relying on the reader to check.

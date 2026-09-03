@@ -81,6 +81,12 @@ down: ## Tear everything down, volumes included.
 ablate: ## Ablation A-C (D at M6b). Artefacts to reports/runs/.
 	@$(GO) run ./cmd/harness ablate --out $(RUN_DIR) --runs 3
 
+perf: ## NFR-1/NFR-2 smoke. Its own gate: a latency assertion inside `check` is flaky.
+	@SHADOWBOOK_LEDGER_DSN="$(LEDGER_DSN)" $(GO) test -tags=perf -count=1 -v -timeout 10m ./internal/ledger/perf/
+
+security: ## Pre-public sweep: secrets, digest pins, dependency audits (T-052)
+	@scripts/security-sweep.sh
+
 preflight: ## Report whether an ablation could run here, and why not if not.
 	@$(GO) run ./cmd/harness preflight
 
@@ -109,5 +115,5 @@ gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
 	@if command -v protoc >/dev/null; then scripts/check-gen-diff.sh; \
 	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
 
-.PHONY: help check coverage fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
+.PHONY: help check coverage perf security fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
         coverage demo up up-chaos down ablate report proto
