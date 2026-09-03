@@ -1,0 +1,1146 @@
+{
+  "combined": {
+    "W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 850,
+        "model_difference": 299,
+        "timing": 739
+      },
+      "discoveries": {
+        "Q1": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "fee:1200",
+            "round:1"
+          ]
+        },
+        "Q10": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "round:1"
+          ]
+        },
+        "Q11": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "missing:legacy",
+            "txn:whole"
+          ]
+        },
+        "Q12": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:legacy",
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+2d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-2d",
+            "timing:-3d"
+          ]
+        },
+        "Q2": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:legacy",
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+2d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-2d",
+            "timing:-3d"
+          ]
+        },
+        "Q3": {
+          "breaks_at_first_detection": 60,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 3,
+          "first_detected_date": "2028-03-01",
+          "first_detected_grain": "transaction",
+          "isolated": true,
+          "signatures": [
+            "basis:366_360"
+          ]
+        },
+        "Q4": {
+          "breaks_at_first_detection": 81,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 25,
+          "first_detected_date": "2028-03-31",
+          "first_detected_grain": "account_day",
+          "isolated": false,
+          "signatures": [
+            "fee:1200"
+          ]
+        },
+        "Q5": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:legacy",
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+2d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-2d",
+            "timing:-3d"
+          ]
+        },
+        "Q6": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        },
+        "Q7": {
+          "breaks_at_first_detection": 81,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 25,
+          "first_detected_date": "2028-03-31",
+          "first_detected_grain": "account_day",
+          "isolated": false,
+          "signatures": [
+            "fee:1200"
+          ]
+        },
+        "Q8": {
+          "breaks_at_first_detection": 67,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 4,
+          "first_detected_date": "2028-03-02",
+          "first_detected_grain": "account_day",
+          "isolated": true,
+          "signatures": [
+            "hold:expiry"
+          ]
+        },
+        "Q9": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "missing:legacy",
+            "txn:whole"
+          ]
+        }
+      },
+      "enabled": [
+        "Q1",
+        "Q10",
+        "Q11",
+        "Q12",
+        "Q2",
+        "Q3",
+        "Q4",
+        "Q5",
+        "Q6",
+        "Q7",
+        "Q8",
+        "Q9"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 1888,
+      "window": "W1"
+    },
+    "W2": {
+      "business_days": 10,
+      "by_classification": {
+        "defect": 291,
+        "model_difference": 91,
+        "timing": 214
+      },
+      "discoveries": {
+        "Q1": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "round:1"
+          ]
+        },
+        "Q10": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "round:1"
+          ]
+        },
+        "Q11": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "missing:legacy",
+            "missing:shadow",
+            "txn:whole"
+          ]
+        },
+        "Q12": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-3d"
+          ]
+        },
+        "Q2": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-3d"
+          ]
+        },
+        "Q3": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        },
+        "Q4": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        },
+        "Q5": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-3d"
+          ]
+        },
+        "Q6": {
+          "breaks_at_first_detection": 67,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 8,
+          "first_detected_date": "2028-10-11",
+          "first_detected_grain": "account_day",
+          "isolated": true,
+          "signatures": [
+            "basis:366_365"
+          ]
+        },
+        "Q7": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        },
+        "Q8": {
+          "breaks_at_first_detection": 68,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 4,
+          "first_detected_date": "2028-10-05",
+          "first_detected_grain": "account_day",
+          "isolated": true,
+          "signatures": [
+            "hold:expiry"
+          ]
+        },
+        "Q9": {
+          "breaks_at_first_detection": 42,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "missing:legacy",
+            "missing:shadow",
+            "txn:whole"
+          ]
+        }
+      },
+      "enabled": [
+        "Q1",
+        "Q10",
+        "Q11",
+        "Q12",
+        "Q2",
+        "Q3",
+        "Q4",
+        "Q5",
+        "Q6",
+        "Q7",
+        "Q8",
+        "Q9"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 596,
+      "window": "W2"
+    }
+  },
+  "per_quirk": {
+    "Q1/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 76,
+        "model_difference": 323,
+        "timing": 1
+      },
+      "discoveries": {
+        "Q1": {
+          "breaks_at_first_detection": 38,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 2,
+          "first_detected_date": "2028-02-29",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "balance:ledger:round:1",
+            "round:1"
+          ]
+        }
+      },
+      "enabled": [
+        "Q1"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 400,
+      "window": "W1"
+    },
+    "Q1/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q1": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q1"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W2"
+    },
+    "Q10/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 89,
+        "model_difference": 235,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q10": {
+          "breaks_at_first_detection": 6,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "balance:ledger:round:1",
+            "round:1"
+          ]
+        }
+      },
+      "enabled": [
+        "Q10"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 324,
+      "window": "W1"
+    },
+    "Q10/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 25,
+        "model_difference": 77,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q10": {
+          "breaks_at_first_detection": 13,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "balance:ledger:round:1",
+            "round:1"
+          ]
+        }
+      },
+      "enabled": [
+        "Q10"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 102,
+      "window": "W2"
+    },
+    "Q11/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 65,
+        "model_difference": 29,
+        "timing": 30
+      },
+      "discoveries": {
+        "Q11": {
+          "breaks_at_first_detection": 4,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "account_day",
+          "isolated": false,
+          "signatures": [
+            "txn:whole"
+          ]
+        }
+      },
+      "enabled": [
+        "Q11"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 124,
+      "window": "W1"
+    },
+    "Q11/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 18,
+        "model_difference": 9,
+        "timing": 9
+      },
+      "discoveries": {
+        "Q11": {
+          "breaks_at_first_detection": 4,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "account_day",
+          "isolated": false,
+          "signatures": [
+            "txn:whole"
+          ]
+        }
+      },
+      "enabled": [
+        "Q11"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 36,
+      "window": "W2"
+    },
+    "Q12/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 6,
+        "model_difference": 0,
+        "timing": 12
+      },
+      "discoveries": {
+        "Q12": {
+          "breaks_at_first_detection": 9,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 26,
+          "first_detected_date": "2028-04-01",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:legacy",
+            "timing:+2d",
+            "timing:-2d"
+          ]
+        }
+      },
+      "enabled": [
+        "Q12"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 18,
+      "window": "W1"
+    },
+    "Q12/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q12": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q12"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W2"
+    },
+    "Q2/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 787,
+        "model_difference": 15,
+        "timing": 697
+      },
+      "discoveries": {
+        "Q2": {
+          "breaks_at_first_detection": 38,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:shadow",
+            "timing:+1d",
+            "timing:+3d",
+            "timing:-1d",
+            "timing:-3d"
+          ]
+        }
+      },
+      "enabled": [
+        "Q2"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 1499,
+      "window": "W1"
+    },
+    "Q2/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 233,
+        "model_difference": 13,
+        "timing": 192
+      },
+      "discoveries": {
+        "Q2": {
+          "breaks_at_first_detection": 38,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "timing:+1d",
+            "timing:+4d",
+            "timing:-1d",
+            "timing:-4d"
+          ]
+        }
+      },
+      "enabled": [
+        "Q2"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 438,
+      "window": "W2"
+    },
+    "Q3/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 116,
+        "model_difference": 14,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q3": {
+          "breaks_at_first_detection": 13,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 3,
+          "first_detected_date": "2028-03-01",
+          "first_detected_grain": "transaction",
+          "isolated": true,
+          "signatures": [
+            "basis:366_360"
+          ]
+        }
+      },
+      "enabled": [
+        "Q3"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 130,
+      "window": "W1"
+    },
+    "Q3/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q3": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q3"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W2"
+    },
+    "Q4/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 28,
+        "model_difference": 107,
+        "timing": 1
+      },
+      "discoveries": {
+        "Q4": {
+          "breaks_at_first_detection": 14,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 2,
+          "first_detected_date": "2028-02-29",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "balance:ledger:fee:300",
+            "balance:ledger:fee:500",
+            "fee:300",
+            "fee:500"
+          ]
+        }
+      },
+      "enabled": [
+        "Q4"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 136,
+      "window": "W1"
+    },
+    "Q4/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q4": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q4"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W2"
+    },
+    "Q5/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q5": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q5"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W1"
+    },
+    "Q5/W2": {
+      "business_days": 10,
+      "by_classification": {
+        "defect": 86,
+        "model_difference": 48,
+        "timing": 16
+      },
+      "discoveries": {
+        "Q5": {
+          "breaks_at_first_detection": 66,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 6,
+          "first_detected_date": "2028-10-09",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "account_day_missing:shadow",
+            "timing:+1d"
+          ]
+        }
+      },
+      "enabled": [
+        "Q5"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 150,
+      "window": "W2"
+    },
+    "Q6/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 117,
+        "model_difference": 13,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q6": {
+          "breaks_at_first_detection": 13,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 3,
+          "first_detected_date": "2028-03-01",
+          "first_detected_grain": "transaction",
+          "isolated": true,
+          "signatures": [
+            "basis:366_365"
+          ]
+        }
+      },
+      "enabled": [
+        "Q6"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 130,
+      "window": "W1"
+    },
+    "Q6/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q6": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q6"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W2"
+    },
+    "Q7/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 1,
+        "model_difference": 16,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q7": {
+          "breaks_at_first_detection": 7,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 25,
+          "first_detected_date": "2028-03-31",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "balance:ledger:fee:1200",
+            "fee:1200"
+          ]
+        }
+      },
+      "enabled": [
+        "Q7"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 17,
+      "window": "W1"
+    },
+    "Q7/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q7": {
+          "breaks_at_first_detection": null,
+          "breaks_to_isolate": null,
+          "detected": false,
+          "first_detected_business_day": null,
+          "first_detected_date": null,
+          "first_detected_grain": null,
+          "isolated": false,
+          "signatures": []
+        }
+      },
+      "enabled": [
+        "Q7"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 0,
+      "window": "W2"
+    },
+    "Q8/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 1,
+        "model_difference": 212,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q8": {
+          "breaks_at_first_detection": 12,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 4,
+          "first_detected_date": "2028-03-02",
+          "first_detected_grain": "account_day",
+          "isolated": true,
+          "signatures": [
+            "hold:expiry"
+          ]
+        }
+      },
+      "enabled": [
+        "Q8"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 213,
+      "window": "W1"
+    },
+    "Q8/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 0,
+        "model_difference": 36,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q8": {
+          "breaks_at_first_detection": 12,
+          "breaks_to_isolate": 1,
+          "detected": true,
+          "first_detected_business_day": 4,
+          "first_detected_date": "2028-10-05",
+          "first_detected_grain": "account_day",
+          "isolated": true,
+          "signatures": [
+            "hold:expiry"
+          ]
+        }
+      },
+      "enabled": [
+        "Q8"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 36,
+      "window": "W2"
+    },
+    "Q9/W1": {
+      "business_days": 31,
+      "by_classification": {
+        "defect": 60,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q9": {
+          "breaks_at_first_detection": 2,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-02-28",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "missing:legacy"
+          ]
+        }
+      },
+      "enabled": [
+        "Q9"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 60,
+      "window": "W1"
+    },
+    "Q9/W2": {
+      "business_days": 9,
+      "by_classification": {
+        "defect": 18,
+        "model_difference": 0,
+        "timing": 0
+      },
+      "discoveries": {
+        "Q9": {
+          "breaks_at_first_detection": 2,
+          "breaks_to_isolate": null,
+          "detected": true,
+          "first_detected_business_day": 1,
+          "first_detected_date": "2028-10-02",
+          "first_detected_grain": "transaction",
+          "isolated": false,
+          "signatures": [
+            "missing:legacy"
+          ]
+        }
+      },
+      "enabled": [
+        "Q9"
+      ],
+      "oldest_open_age": 0,
+      "total_breaks": 18,
+      "window": "W2"
+    }
+  },
+  "quirk_specs": {
+    "Q1": {
+      "cadence": "daily",
+      "documented": "round half-even",
+      "expected_grain": "account_day",
+      "legacy": "round half-up to minor units",
+      "name": "interest_rounding_half_up"
+    },
+    "Q10": {
+      "cadence": "daily",
+      "documented": "JPY scale 0",
+      "expected_grain": "transaction",
+      "legacy": "JPY stored with scale 2 and truncated",
+      "name": "jpy_two_decimals_truncated"
+    },
+    "Q11": {
+      "cadence": "daily",
+      "documented": "no suppression; duplicates are the client's responsibility",
+      "expected_grain": "transaction",
+      "legacy": "same amount + same counterparty within 60 s silently dropped",
+      "name": "duplicate_suppression_60s"
+    },
+    "Q12": {
+      "cadence": "month_boundary",
+      "documented": "posted on calendar first of the month",
+      "expected_grain": "account_day",
+      "legacy": "interest posted on first business day of the month",
+      "name": "interest_posted_first_business_day"
+    },
+    "Q2": {
+      "cadence": "daily",
+      "documented": "cut-off is 17:00:00.000 exclusive",
+      "expected_grain": "transaction",
+      "legacy": "transactions at 16:59:59.999 belong to the next business day",
+      "name": "cutoff_inclusive_boundary"
+    },
+    "Q3": {
+      "cadence": "daily",
+      "documented": "ACT/365 on all products",
+      "expected_grain": "account_day",
+      "legacy": "ACT/360 on product SAV-01",
+      "name": "accrual_basis_act360_on_product"
+    },
+    "Q4": {
+      "cadence": "month_end",
+      "documented": "fee applies to all accounts",
+      "expected_grain": "account_day",
+      "legacy": "monthly fee waived for accounts opened before 2019-01-01",
+      "name": "grandfathered_fee_waiver"
+    },
+    "Q5": {
+      "cadence": "annual_october",
+      "documented": "Columbus Day is a holiday",
+      "expected_grain": "transaction",
+      "legacy": "Columbus Day is a business day",
+      "name": "columbus_day_is_business_day"
+    },
+    "Q6": {
+      "cadence": "leap_year",
+      "documented": "ACT/ACT in leap years",
+      "expected_grain": "account_day",
+      "legacy": "leap years accrue on ACT/365 (366th day accrues)",
+      "name": "leap_day_accrual_act365"
+    },
+    "Q7": {
+      "cadence": "month_end",
+      "documented": "assessed on available balance",
+      "expected_grain": "account_day",
+      "legacy": "minimum-balance fee assessed on ledger balance",
+      "name": "min_balance_fee_on_ledger_balance"
+    },
+    "Q8": {
+      "cadence": "daily",
+      "documented": "holds expire 72 hours after placement",
+      "expected_grain": "account_day",
+      "legacy": "holds expire at midnight on placement day + 3",
+      "name": "hold_expiry_midnight_n_plus_3"
+    },
+    "Q9": {
+      "cadence": "daily",
+      "documented": "a reversal posts a contra entry referencing the original",
+      "expected_grain": "transaction",
+      "legacy": "a reversal deletes the original entry",
+      "name": "reversal_deletes_original"
+    }
+  },
+  "seed": 20260903,
+  "windows": [
+    "W1",
+    "W2"
+  ]
+}

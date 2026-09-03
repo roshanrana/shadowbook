@@ -9,6 +9,7 @@ UV ?= uv
 
 # Integration tests need a PostgreSQL. `make up` provides one; CI provides one
 # as a service. When unset, integration tests skip loudly rather than fail.
+RUN_DIR ?= reports/runs/demo
 LEDGER_DSN ?= postgres://shadowbook:shadowbook@localhost:5433/ledger?sslmode=disable
 RECON_DSN  ?= postgres://shadowbook:shadowbook@localhost:5434/recon?sslmode=disable
 
@@ -62,8 +63,8 @@ coverage: ## Report coverage (not yet a gate -- see T-053)
 
 ## ---------------------------------------------------------------- run it
 
-demo: ## Both windows, both findings, < 5 min.
-	@echo "make demo: not wired yet (M4). See STATE.md." && exit 1
+demo: ## Both windows, Finding 1, < 5 min. Regenerates reports/FINDINGS.md.
+	@scripts/demo.sh
 
 up: ## Single-broker profile.
 	docker compose --profile single up -d
@@ -78,7 +79,10 @@ ablate: ## Ablation A-C (D at M6b). Artefacts to reports/runs/.
 	@echo "make ablate: not wired yet (M6). See STATE.md." && exit 1
 
 report: ## Render reports/FINDINGS.md from run artefacts. Deterministic.
-	@echo "make report: not wired yet (M6). See STATE.md." && exit 1
+	@$(UV) run python -m report.render \
+		--finding1 $(RUN_DIR)/finding1.json \
+		--finding2 $(RUN_DIR)/finding2.json \
+		--repo . --out reports/FINDINGS.md
 
 proto: ## Regenerate Go and Python from contracts/. Output is committed.
 	@cd contracts && protoc --go_out=../gen/go --go_opt=paths=source_relative \
