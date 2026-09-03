@@ -4,7 +4,6 @@ package outbox_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -15,28 +14,15 @@ import (
 	"github.com/roshanrana/shadowbook/internal/ledger/outbox"
 	"github.com/roshanrana/shadowbook/internal/ledger/posting"
 	"github.com/roshanrana/shadowbook/internal/ledger/store"
+	"github.com/roshanrana/shadowbook/internal/testsupport"
 )
 
 const topic = "shadowbook.postings.v1"
 
 func setup(t *testing.T) (*store.Store, *posting.Service, []uuid.UUID) {
 	t.Helper()
-	dsn := os.Getenv("SHADOWBOOK_LEDGER_DSN")
-	if dsn == "" {
-		t.Skip("SHADOWBOOK_LEDGER_DSN unset")
-	}
 	ctx := context.Background()
-	st, err := store.Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(st.Close)
-	if _, err := st.Pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := st.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
+	st := testsupport.FreshStore(t)
 	accounts := []uuid.UUID{
 		uuid.MustParse("11111111-1111-1111-1111-111111111111"),
 		uuid.MustParse("22222222-2222-2222-2222-222222222222"),

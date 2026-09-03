@@ -6,13 +6,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/roshanrana/shadowbook/internal/testsupport"
 	"github.com/roshanrana/shadowbook/migrations"
 )
 
@@ -20,34 +20,26 @@ import (
 // PostgreSQL 16.13 before the schema was approved (D-015, LLD §8), so a failure
 // here means the SQL was transcribed wrongly, not that the design is wrong.
 
-func dsn(t *testing.T) string {
-	t.Helper()
-	d := os.Getenv("SHADOWBOOK_LEDGER_DSN")
-	if d == "" {
-		t.Skip("SHADOWBOOK_LEDGER_DSN unset; run `make up` (or ~/pg.sh) first")
-	}
-	return d
-}
-
-// freshDB gives each test its own schema-reset database.
+// freshDB gives each test its OWN database, not a reset schema in a shared one.
+//
+// go test runs packages in parallel by default. Resetting one shared schema
+// meant two packages tore each other's tables down mid-run, and the failures
+// looked like migration bugs rather than a fixture problem.
 func freshDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("pgx", dsn(t))
+	st := testsupport.FreshStore(t) // creates, migrates and drops its own database
+	db, err := sql.Open("pgx", st.DSN())
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
-		t.Fatalf("reset schema: %v", err)
-	}
-	n, err := migrations.Apply(ctx, db)
+	all, err := migrations.Load()
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatal(err)
 	}
-	if n != 6 {
-		t.Fatalf("applied %d migrations, want 6", n)
+	if len(all) != 6 {
+		t.Fatalf("loaded %d migrations, want 6", len(all))
 	}
 	return db
 }
@@ -59,10 +51,10 @@ func TestApplyIsCleanAndIdempotent(t *testing.T) {
 	// Re-running must be a no-op.
 	n, err := migrations.Apply(ctx, db)
 	if err != nil {
-		t.Fatalf("second apply: %v", err)
+		t.Fatalf("re-apply: %v", err)
 	}
 	if n != 0 {
-		t.Fatalf("second apply applied %d migrations, want 0", n)
+		t.Fatalf("re-apply applied %d migrations, want 0", n)
 	}
 
 	want := []string{

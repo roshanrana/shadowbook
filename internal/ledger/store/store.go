@@ -174,3 +174,8 @@ func toDate(b bizdate.BusinessDate) time.Time {
 func fromDate(t time.Time) bizdate.BusinessDate {
 	return bizdate.BusinessDate{Y: t.Year(), M: t.Month(), D: t.Day()}
 }
+
+// DSN returns the connection string this store was opened with. Used by tests
+// that need a second handle -- database/sql for the migration suite, for
+// instance -- to the same database.
+func (s *Store) DSN() string { return s.dsn }

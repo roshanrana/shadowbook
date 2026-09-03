@@ -4,7 +4,6 @@ package accrual_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -18,26 +17,13 @@ import (
 	"github.com/roshanrana/shadowbook/internal/ledger/posting"
 	"github.com/roshanrana/shadowbook/internal/ledger/store"
 	"github.com/roshanrana/shadowbook/internal/money"
+	"github.com/roshanrana/shadowbook/internal/testsupport"
 )
 
 func setup(t *testing.T) (*store.Store, *accrual.Engine, *balance.Service, uuid.UUID, uuid.UUID) {
 	t.Helper()
-	dsn := os.Getenv("SHADOWBOOK_LEDGER_DSN")
-	if dsn == "" {
-		t.Skip("SHADOWBOOK_LEDGER_DSN unset")
-	}
 	ctx := context.Background()
-	st, err := store.Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(st.Close)
-	if _, err := st.Pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := st.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
+	st := testsupport.FreshStore(t)
 	if err := consumer.EnsureSuspenseAccounts(ctx, st, bizdate.Date(2028, time.January, 1)); err != nil {
 		t.Fatal(err)
 	}

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -17,28 +16,12 @@ import (
 	"github.com/roshanrana/shadowbook/internal/ledger/posting"
 	"github.com/roshanrana/shadowbook/internal/ledger/store"
 	"github.com/roshanrana/shadowbook/internal/money"
+	"github.com/roshanrana/shadowbook/internal/testsupport"
 )
 
 func newStore(t *testing.T) *store.Store {
 	t.Helper()
-	dsn := os.Getenv("SHADOWBOOK_LEDGER_DSN")
-	if dsn == "" {
-		t.Skip("SHADOWBOOK_LEDGER_DSN unset")
-	}
-	ctx := context.Background()
-	st, err := store.Open(ctx, dsn)
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	t.Cleanup(st.Close)
-
-	if _, err := st.Pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
-		t.Fatalf("reset: %v", err)
-	}
-	if _, err := st.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	return st
+	return testsupport.FreshStore(t)
 }
 
 func seed(t *testing.T, st *store.Store) (a, b uuid.UUID) {
