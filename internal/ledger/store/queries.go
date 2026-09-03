@@ -322,3 +322,106 @@ func CountAppliedMessage(ctx context.Context, q Queryer, messageID string) (int6
 	err := q.QueryRow(ctx, `SELECT count(*) FROM inbox WHERE message_id = $1`, messageID).Scan(&n)
 	return n, err
 }
+
+// ---------------------------------------------------------------- holds
+
+// Hold is an authorisation that reduces available balance only.
+type Hold struct {
+	ID          uuid.UUID
+	AccountID   uuid.UUID
+	Amount      money.Amount
+	PlacedAt    time.Time
+	ExpiresAt   time.Time
+	ReleasedAt  *time.Time
+	ReleaseKind *string
+}
+
+// InsertHold places a hold. expires_at is computed by the caller from the
+// documented 72-hour rule (FR-L5); Q8 is the legacy core using midnight on
+// placement + 3 instead, so this column is what Q8 is measured against.
+func InsertHold(ctx context.Context, q Queryer, h Hold) error {
+	_, err := q.Exec(ctx,
+		`INSERT INTO holds (hold_id, account_id, currency, amount_minor, placed_at, expires_at)
+		 VALUES ($1,$2,$3,$4,$5,$6)`,
+		h.ID, h.AccountID, string(h.Amount.Currency), h.Amount.Minor, h.PlacedAt, h.ExpiresAt)
+	return err
+}
+
+// ReleaseHold closes a hold. Returns ErrNotFound when it does not exist or is
+// already released, so a double release is distinguishable from a typo.
+func ReleaseHold(ctx context.Context, q Queryer, id uuid.UUID, at time.Time, kind string) error {
+	tag, err := q.Exec(ctx,
+		`UPDATE holds SET released_at = $2, release_kind = $3
+		  WHERE hold_id = $1 AND released_at IS NULL`, id, at, kind)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("%w: open hold %s", ErrNotFound, id)
+	}
+	return nil
+}
+
+// ExpireHoldsAsOf releases every open hold whose expires_at has passed, and
+// returns how many. Run as the FIRST phase of EOD so fee assessment sees
+// post-expiry available balance (LLD §3.6).
+func ExpireHoldsAsOf(ctx context.Context, q Queryer, at time.Time) (int64, error) {
+	tag, err := q.Exec(ctx,
+		`UPDATE holds SET released_at = $1, release_kind = 'expired'
+		  WHERE released_at IS NULL AND expires_at <= $1`, at)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// OpenHoldTotal sums holds that are unreleased and not yet expired at `at`.
+// This is the "pending" figure, and ledger minus it is "available".
+func OpenHoldTotal(ctx context.Context, q Queryer, accountID uuid.UUID, at time.Time) (int64, error) {
+	var v int64
+	err := q.QueryRow(ctx,
+		`SELECT coalesce(sum(amount_minor), 0) FROM holds
+		  WHERE account_id = $1 AND released_at IS NULL AND expires_at > $2`,
+		accountID, at).Scan(&v)
+	return v, err
+}
+
+// ---------------------------------------------------------------- checkpoints
+
+// InsertCheckpoint writes a balance checkpoint. Inserts only: the table is
+// append-only and a second checkpoint for the same account-day is a 23505.
+func InsertCheckpoint(ctx context.Context, q Queryer, accountID uuid.UUID, d bizdate.BusinessDate,
+	cur money.Currency, balanceMinor, lastEntryID int64) error {
+	_, err := q.Exec(ctx,
+		`INSERT INTO checkpoints (account_id, business_date, currency, balance_minor, last_entry_id)
+		 VALUES ($1,$2,$3,$4,$5)`,
+		accountID, toDate(d), string(cur), balanceMinor, lastEntryID)
+	return err
+}
+
+// MaxEntryIDAsOf returns the highest entry id on or before a business date,
+// which is the watermark a checkpoint records.
+func MaxEntryIDAsOf(ctx context.Context, q Queryer, accountID uuid.UUID, d bizdate.BusinessDate) (int64, error) {
+	var v int64
+	err := q.QueryRow(ctx,
+		`SELECT coalesce(max(entry_id), 0) FROM entries
+		  WHERE account_id = $1 AND business_date <= $2`, accountID, toDate(d)).Scan(&v)
+	return v, err
+}
+
+// ---------------------------------------------------------------- eod
+
+// ClaimEODRun records that EOD started for a business date. A replay raises
+// 23505 on eod_runs_pkey, which is how EODAlreadyRun is detected.
+func ClaimEODRun(ctx context.Context, q Queryer, d bizdate.BusinessDate) error {
+	_, err := q.Exec(ctx, `INSERT INTO eod_runs (business_date) VALUES ($1)`, toDate(d))
+	return err
+}
+
+// FinishEODRun marks completion and records per-phase timings.
+func FinishEODRun(ctx context.Context, q Queryer, d bizdate.BusinessDate, phases []byte) error {
+	_, err := q.Exec(ctx,
+		`UPDATE eod_runs SET finished_at = now(), phases = $2 WHERE business_date = $1`,
+		toDate(d), phases)
+	return err
+}
