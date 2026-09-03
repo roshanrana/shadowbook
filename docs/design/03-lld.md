@@ -1,6 +1,6 @@
 # Low-Level Design — SHADOWBOOK
 
-Status: draft
+Status: **approved 2026-09-03** — interfaces in §4 are now FROZEN
 HLD: `docs/design/02-hld.md` (approved 2026-09-03) · Requirements: `docs/design/01-requirements.md` · Decisions: `docs/design/decisions.md`
 
 > Interfaces in §4 are **frozen contracts** on approval. Changing one afterwards is an LLD change: update this document, list every affected task pack, get sign-off, then propagate. It is not a mid-task decision.

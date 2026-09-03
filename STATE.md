@@ -8,7 +8,9 @@
 
 **Phase 1 — HLD: COMPLETE. Approved by owner 2026-09-03**, including all four §12 open questions and the full §7 stack table (D-010 … D-013).
 
-**Phase 2 — LLD: DRAFTED, AWAITING OWNER APPROVAL.** DDL and balance query executed against PostgreSQL 16.13 (`03-lld.md` §8); two defects found and fixed before presenting. `docs/design/03-lld.md`. Interfaces defined there are frozen on approval: changing one afterwards is an LLD change requiring sign-off and propagation to every affected task pack.
+**Phase 2 — LLD: COMPLETE. Approved by owner 2026-09-03.** Interfaces in `03-lld.md` §4 are now **FROZEN** — changing one is a plan change requiring sign-off and propagation to every affected task pack. DDL verified against PostgreSQL 16.13 (§8); two defects fixed before approval (D-015).
+
+**Phase 3 — Execution plan: DRAFTED, AWAITING OWNER APPROVAL.** `docs/design/04-execution-plan.md` plus task packs in `docs/tasks/`. **This is the hard gate: no application code may be written until the owner replies with the literal word "approved."** `docs/design/03-lld.md`. Interfaces defined there are frozen on approval: changing one afterwards is an LLD change requiring sign-off and propagation to every affected task pack.
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
 
@@ -28,8 +30,9 @@
 
 ## Now / next
 
-- **Now:** Phase 0 gate — owner approval of `01-requirements.md`, after the accrual-basis defect above is resolved. Five questions are answered; nothing else blocks the gate.
-- **Next:** Phase 1 HLD. Stack questions still open for the HLD: Protobuf tooling (buf vs protoc), Postgres driver (pgx vs database/sql), migration tool (goose vs golang-migrate vs sqlc-adjacent), HTTP vs gRPC for FR-L1, and whether legacy-sim feeds the ledger via the API or the topic (FR-S4). The Kafka client and load generator are already settled (D-005, D-006).
+- **Now:** Phase 3 hard gate — owner approval of `docs/design/04-execution-plan.md`. **No application code until the owner replies "approved."**
+- **Next:** Phase 4 guardrails — wave 1 is T-001 alone (scaffold the LLD §1 tree), then wave 2 is T-002, T-003, T-004 in parallel. Read `.claude/skills/enterprise-dev-lifecycle/references/validation-shipping.md` (guardrails section) before starting T-002.
+- **Plan shape:** 55 tasks, 10 milestones, 19 waves. Packs for T-001…T-008 are written in full; T-009…T-055 are stubs refined at each milestone boundary. `docs/design/04-execution-plan.md` §3 is the scheduling source of truth — this file mirrors only the current wave.
 
 ## Milestones (provisional — finalised in Phase 3)
 

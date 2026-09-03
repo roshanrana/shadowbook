@@ -94,3 +94,17 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 **Context:** HLD §7, with registry versions verified 2026-09-03.
 **Decision:** HTTP/JSON on `net/http` + stdlib mux (gRPC rejected: vegeta drives HTTP, so it would undo D-005); `jackc/pgx` v5.10.0 (typed `*pgconn.PgError` is what makes idempotency-by-constraint real); `pressly/goose` v3.28.0 with embedded plain SQL (invariants live in reviewable DDL); `buf` with generated code checked in (`buf breaking` guards the frozen contract, and check-in keeps NFR-8 offline); `prometheus/client_golang`; **no pandas or polars in `reconcile`** — stdlib `csv`/`dataclasses`/`decimal` with explicit sort keys, because deterministic ordering (NFR-5) beats speed we do not need; Jinja2 for report rendering.
 **Consequences:** Two toolchains, few dependencies, everything mypy- and vet-checkable. Any later wish for a dataframe library in `reconcile` is a decision to re-open here, not a mid-task convenience.
+
+## D-014 — LLD judgement calls accepted: forward-only migrations, recon Postgres, no tracing
+
+**Status:** accepted (owner, Phase 2 gate, 2026-09-03)
+**Context:** `03-lld.md` §9 flagged the three decisions most likely to attract disagreement, rather than burying them.
+**Decision:** (a) Migrations are forward-only with no down path — the databases are recreated per run and a reversible migration on an append-only table is a fiction. (b) `reconcile` owns its own Postgres rather than emitting files, which buys break ageing across business days cheaply at the cost of a second database in compose. (c) No OpenTelemetry — four processes with structured logs and a shared request ID do not need it, and it would cost `make check` time for no finding.
+**Consequences:** Anyone reading the repo who expects down-migrations or traces should read this entry first. If SHADOWBOOK ever outgrows the harness framing, (a) and (c) are the first two to revisit.
+
+## D-015 — Ledger DDL and balance query verified against PostgreSQL 16.13 before approval
+
+**Status:** accepted (2026-09-03)
+**Context:** The LLD's schema is the implementation contract for M0 and M1. Schema defects found in Phase 4 cost a whole session under the two-strike rule.
+**Decision:** SQL in `03-lld.md` is executed against a real PostgreSQL 16 instance and its invariants exercised before the document is presented for approval. Recorded in `03-lld.md` §8.
+**Consequences:** Two defects were caught this way — `entries.entry_id` typed `BIGGSERIAL`, and a balance query missing its mandatory `GROUP BY` that also returned no row for an account with no checkpoint. The same practice applies to any future DDL change: it is executed before it is approved, not after it fails.
