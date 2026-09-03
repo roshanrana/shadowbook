@@ -14,5 +14,7 @@ ignore = ["E501"]
 # modelled business day, not moments in the real world, and attaching a timezone
 # would assert something untrue about them. Determinism (NFR-5) is enforced by
 # never calling now() at all -- see legacy_sim.generator -- not by tz-awareness.
+# scripts/ are CLI tools whose whole output IS stdout.
+"scripts/**" = ["T20"]
 "legacy-sim/**" = ["DTZ"]
 "reconcile/**" = ["DTZ"]

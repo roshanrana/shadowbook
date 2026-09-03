@@ -123,8 +123,13 @@ func (e *Engine) Run(ctx context.Context, d bizdate.BusinessDate, now time.Time)
 	return rep, nil
 }
 
+// isMonthEnd reports whether the next calendar day falls in a different month.
+//
+// The obvious formulation -- comparing d.AddDays(1) with Date(d.Y, d.M, d.D+1)
+// -- is always false, because Date normalises 32 March to 1 April and the two
+// sides agree by construction. It silently meant no fee was ever assessed.
 func (e *Engine) isMonthEnd(d bizdate.BusinessDate) bool {
-	return !d.AddDays(1).Equal(bizdate.Date(d.Y, d.M, d.D+1))
+	return d.AddDays(1).M != d.M
 }
 
 // InterestFor computes a month's interest exactly.

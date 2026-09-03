@@ -42,6 +42,11 @@ type errorEnvelope struct {
 // retry and getting that wrong hides a bug.
 func classify(err error) (code string, status int) {
 	switch {
+	// A malformed body is the client's fault. Reporting it as 500 tells the
+	// caller to retry a request that can never succeed -- and hides a 400 in
+	// the error-rate graph as if it were a ledger failure.
+	case errors.Is(err, errInvalidBody):
+		return CodeInvalidRequest, http.StatusBadRequest
 	case errors.Is(err, posting.ErrMissingIdempotencyKey):
 		return CodeMissingIdempotencyKey, http.StatusBadRequest
 	case errors.Is(err, posting.ErrUnknownKind), errors.Is(err, money.ErrUnknownCurrency):

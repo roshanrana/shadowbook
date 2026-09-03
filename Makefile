@@ -54,12 +54,15 @@ test-integration: ## Tests needing a live PostgreSQL; skip loudly when absent
 test-race: ## go test -race
 	@$(GO) test -race ./... || { echo "go test -race: FAILED"; exit 1; }
 
-# TODO(T-053): enforce NFR-7 coverage thresholds here once there is code to cover
-# (ledger >= 85%, posting path >= 95%, reconcile classification >= 90%,
-#  legacy-sim >= 85% per D-011).
-coverage: ## Report coverage (not yet a gate -- see T-053)
-	@$(GO) test -coverprofile=coverage.out ./... && $(GO) tool cover -func=coverage.out | tail -1
-	@$(UV) run pytest --cov=legacy_sim --cov=reconcile --cov=report -m "not integration"
+coverage: ## NFR-7 gate: ledger >= 85%, posting path >= 95%, reconcile >= 90%, legacy-sim >= 85%
+	@scripts/coverage.sh
+	@$(UV) run pytest -q -m "not integration" --cov=reconcile --cov-fail-under=90 \
+		--cov-report=term:skip-covered > /dev/null \
+		|| { echo "coverage: reconcile below 90% (NFR-7)"; exit 1; }
+	@$(UV) run pytest -q -m "not integration" --cov=legacy_sim --cov-fail-under=85 \
+		--cov-report=term:skip-covered > /dev/null \
+		|| { echo "coverage: legacy-sim below 85% (D-011)"; exit 1; }
+	@echo "coverage: all NFR-7 targets met"
 
 ## ---------------------------------------------------------------- run it
 
@@ -76,7 +79,10 @@ down: ## Tear everything down, volumes included.
 	docker compose --profile single --profile chaos down -v
 
 ablate: ## Ablation A-C (D at M6b). Artefacts to reports/runs/.
-	@echo "make ablate: not wired yet (M6). See STATE.md." && exit 1
+	@$(GO) run ./cmd/harness ablate --out $(RUN_DIR) --runs 3
+
+preflight: ## Report whether an ablation could run here, and why not if not.
+	@$(GO) run ./cmd/harness preflight
 
 report: ## Render reports/FINDINGS.md from run artefacts. Deterministic.
 	@$(UV) run python -m report.render \
@@ -103,5 +109,5 @@ gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
 	@if command -v protoc >/dev/null; then scripts/check-gen-diff.sh; \
 	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
 
-.PHONY: help check fmt fmt-check lint typecheck gen-check golden-check golden-calendar test-unit test-integration test-race \
+.PHONY: help check coverage fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
         coverage demo up up-chaos down ablate report proto

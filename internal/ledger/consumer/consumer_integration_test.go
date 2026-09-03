@@ -242,3 +242,121 @@ func TestSuspenseAccountIsDeterministicPerCurrency(t *testing.T) {
 		t.Fatal("USD and JPY share a suspense account")
 	}
 }
+
+func TestApplyRejectsMalformedMovements(t *testing.T) {
+	st := newStore(t)
+	acct := seedAccount(t, st)
+	ctx := context.Background()
+
+	bad := func(mutate func(*shadowbookv1.MovementEvent)) broker.Record {
+		ev := &shadowbookv1.MovementEvent{
+			MessageId: "m-x", AccountId: acct.String(),
+			Amount:       &shadowbookv1.Money{Minor: 100, Currency: "USD", Scale: 2},
+			BusinessDate: "2028-02-29", ValueDate: "2028-02-29",
+			PostedAt: "2028-02-29T10:00:00Z", Kind: "transfer",
+		}
+		mutate(ev)
+		b, err := proto.MarshalOptions{Deterministic: true}.Marshal(ev)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return broker.Record{Topic: topic, Key: acct.String(), Value: b}
+	}
+
+	for _, tc := range []struct {
+		name string
+		rec  broker.Record
+	}{
+		{"no message id", bad(func(e *shadowbookv1.MovementEvent) { e.MessageId = "" })},
+		{"bad account id", bad(func(e *shadowbookv1.MovementEvent) { e.AccountId = "not-a-uuid" })},
+		{"unknown currency", bad(func(e *shadowbookv1.MovementEvent) { e.Amount.Currency = "XXX" })},
+		{"bad business date", bad(func(e *shadowbookv1.MovementEvent) { e.BusinessDate = "29/02/2028" })},
+		{"bad value date", bad(func(e *shadowbookv1.MovementEvent) { e.ValueDate = "nope" })},
+		{"bad posted_at", bad(func(e *shadowbookv1.MovementEvent) { e.PostedAt = "yesterday" })},
+		{"undecodable payload", broker.Record{Topic: topic, Key: acct.String(), Value: []byte{0xff, 0xfe}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := broker.NewFake()
+			if err := fake.Produce(ctx, []broker.Record{tc.rec}); err != nil {
+				t.Fatal(err)
+			}
+			c, err := consumer.New(st, fake, consumer.Options{Mode: consumer.InboxDedup, Topic: topic})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.RunOnce(ctx); err == nil {
+				t.Fatalf("a malformed movement (%s) was applied", tc.name)
+			}
+			assertInvariant(t, st)
+		})
+	}
+}
+
+func TestRunConsumesUntilCancelled(t *testing.T) {
+	st := newStore(t)
+	acct := seedAccount(t, st)
+	fake := broker.NewFake()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if err := fake.Produce(ctx, []broker.Record{
+		movement(t, acct, "r-1", 100), movement(t, acct, "r-2", -100),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := consumer.New(st, fake, consumer.Options{Mode: consumer.InboxDedup, Topic: topic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	deadline := time.After(10 * time.Second)
+	for countEntries(t, st, acct) < 2 {
+		select {
+		case <-deadline:
+			t.Fatal("Run never applied the pending movements")
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run returned %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not stop on cancellation")
+	}
+	assertInvariant(t, st)
+}
+
+func TestRunStopsCleanlyOnAClosedBroker(t *testing.T) {
+	st := newStore(t)
+	fake := broker.NewFake()
+	_ = fake.Close()
+	c, err := consumer.New(st, fake, consumer.Options{Mode: consumer.InboxDedup, Topic: topic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Run(context.Background()); err != nil {
+		t.Fatalf("a closed broker should end the loop cleanly, got %v", err)
+	}
+}
+
+func TestEnsureSuspenseAccountsIsRepeatable(t *testing.T) {
+	st := newStore(t)
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		if err := consumer.EnsureSuspenseAccounts(ctx, st, bizdate.Date(2028, time.January, 1)); err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+	}
+	var n int64
+	if err := st.Pool.QueryRow(ctx,
+		`SELECT count(*) FROM accounts WHERE product_code = 'SUSPENSE'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Fatalf("suspense accounts = %d, want 3 (one per currency)", n)
+	}
+}
