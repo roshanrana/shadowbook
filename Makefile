@@ -17,7 +17,7 @@ help: ## List targets
 
 ## ---------------------------------------------------------------- the gate
 
-check: fmt-check lint typecheck gen-check test-unit test-integration test-race ## THE definition of done.
+check: fmt-check lint typecheck gen-check golden-check test-unit test-integration test-race ## THE definition of done.
 	@echo "make check: PASS"
 
 fmt-check: ## gofmt + ruff format, non-mutating
@@ -86,9 +86,18 @@ proto: ## Regenerate Go and Python from contracts/. Output is committed.
 		-I . $$(find . -name '*.proto' | sort)
 	@echo "make proto: regenerated. Commit gen/ if it changed."
 
+golden-calendar: ## Regenerate the Go->Python calendar golden file
+	@$(GO) run ./cmd/goldencal > legacy-sim/tests/golden/calendar.json
+	@echo "regenerated legacy-sim/tests/golden/calendar.json"
+
+golden-check: ## Fail if the calendar golden file is stale
+	@$(GO) run ./cmd/goldencal > /tmp/calendar.golden.json
+	@diff -q /tmp/calendar.golden.json legacy-sim/tests/golden/calendar.json >/dev/null \
+		|| { echo "calendar golden is stale: run 'make golden-calendar'"; exit 1; }
+
 gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
 	@if command -v protoc >/dev/null; then scripts/check-gen-diff.sh; \
 	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
 
-.PHONY: help check fmt fmt-check lint typecheck gen-check test-unit test-integration test-race \
+.PHONY: help check fmt fmt-check lint typecheck gen-check golden-check golden-calendar test-unit test-integration test-race \
         coverage demo up up-chaos down ablate report proto
