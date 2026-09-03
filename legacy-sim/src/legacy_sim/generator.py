@@ -49,6 +49,38 @@ PRODUCTS: dict[str, dict[str, int | str]] = {
 
 BASIS_POINT_DENOMINATOR = 10_000
 
+# Sized to straddle CHK-01's 100_000 minimum-balance threshold, so an account
+# can be above it on ledger balance and below it on available balance -- which
+# is the only situation in which Q7 differs from documented behaviour.
+HOLD_MINOR = 25_000
+
+# A shared service fee split between two accounts at month end. It is ODD on
+# purpose: half of an odd number is an exact tie, and an exact tie is the only
+# place half-up (Q1) and half-even (documented) can differ at all.
+SHARED_FEE_MINOR = 501
+
+# Opening balances by product. SAV-01 is the interest-bearing product Q3
+# targets; $50,000 makes a month's interest roughly $135, so the ACT/360 vs
+# ACT/ACT gap is around 225 minor units -- comfortably separable from a
+# one-unit rounding difference.
+OPENING_BALANCE_MINOR: dict[str, int] = {
+    "SAV-01": 5_000_000,
+    "CHK-01": 150_000,
+    "CHK-JPY": 900_000,
+}
+
+# Per-product transaction size. CHK-01's are deliberately small relative to its
+# opening balance and its 100_000 minimum-balance threshold, so its balance
+# stays in the band where a 75_000 hold total pushes AVAILABLE below the
+# threshold while LEDGER stays above it. That band is the only place Q7 exists:
+# with retail-sized balances and wholesale-sized transactions the account is
+# never near its own threshold and the quirk cannot fire.
+TXN_MAGNITUDE_MINOR: dict[str, int] = {
+    "CHK-01": 5_000,
+    "SAV-01": 50_000,
+    "CHK-JPY": 40_000,
+}
+
 # Namespace for deterministic account and transaction ids. A random uuid4 would
 # make every run's extracts differ for no reason (NFR-5).
 _NS = uuid.UUID("7d1f4a30-6c25-5e91-8b03-2f9a4d6e1c78")
@@ -65,6 +97,23 @@ def seed_for(component: str, base_seed: int) -> int:
 
 def _det_uuid(*parts: str) -> str:
     return str(uuid.uuid5(_NS, "/".join(parts)))
+
+
+def _det_int(seed: int, *parts: str) -> int:
+    """A deterministic non-negative integer from a seed and a key.
+
+    Transaction values are derived from (seed, account, date, index) rather than
+    drawn in sequence from one RNG. That makes the stream POSITIONALLY
+    INDEPENDENT: adding or removing a day changes only that day.
+
+    This matters for the experiment, not just for tidiness. With a shared
+    sequential RNG, enabling Q5 -- which gives the legacy core one extra
+    business day -- shifted every subsequent draw, so every transaction after
+    Columbus Day differed from the control for reasons that had nothing to do
+    with Q5. The per-quirk runs were not controlled experiments at all.
+    """
+    digest = hashlib.sha256(("|".join((str(seed), *parts))).encode()).digest()
+    return int.from_bytes(digest[:8], "big")
 
 
 @dataclass(slots=True)
@@ -89,10 +138,21 @@ class LegacyCore:
     _holds: list[Hold] = field(init=False, default_factory=list)
     _daily_balance_sum: dict[str, int] = field(init=False, default_factory=dict)
     _last_interest_month: tuple[int, int] | None = field(init=False, default=None)
+    # Transactions the cut-off pushed into a later business date. Without this
+    # they would simply vanish, and Q2 would report as 361 missing records
+    # rather than as the one-day timing difference it is.
+    _carried: list[Txn] = field(init=False, default_factory=list)
 
     def __post_init__(self) -> None:
         self.rng = random.Random(seed_for("legacy-sim", self.base_seed))
-        self._ledger = {a.account_id: 0 for a in self.accounts}
+        # Opening balances. Interest-bearing accounts start with real money,
+        # because at a few hundred minor units a month the difference between
+        # ACT/360 and ACT/ACT rounds to one unit -- indistinguishable from Q1's
+        # rounding quirk. Q3 and Q6 are only separable when the interest is big
+        # enough for a 1.7% basis difference to exceed one minor unit.
+        self._ledger = {
+            a.account_id: OPENING_BALANCE_MINOR.get(a.product_code, 0) for a in self.accounts
+        }
         self._daily_balance_sum = {a.account_id: 0 for a in self.accounts}
 
     # -- accounts -------------------------------------------------------------
@@ -147,9 +207,11 @@ class LegacyCore:
         for a in self.accounts:
             instants = self._instants_for(d, n_per_account)
             for i, at in enumerate(instants):
-                magnitude = 1_000 + self.rng.randrange(0, 250_000)
-                sign = 1 if self.rng.random() < 0.55 else -1
-                counterparty = f"CP-{self.rng.randrange(0, 12):02d}"
+                key = (a.account_id, d.isoformat(), str(i))
+                cap = TXN_MAGNITUDE_MINOR.get(a.product_code, 250_000)
+                magnitude = 1_000 + _det_int(self.base_seed, "amt", *key) % cap
+                sign = 1 if _det_int(self.base_seed, "sign", *key) % 100 < 55 else -1
+                counterparty = f"CP-{_det_int(self.base_seed, 'cp', *key) % 12:02d}"
 
                 true_hundredths: int | None = None
                 if a.currency == "JPY":
@@ -157,7 +219,7 @@ class LegacyCore:
                     # the amounts land on an exact half-yen, which is where the
                     # documented half-even rounding and Q10's truncation part
                     # company.
-                    base = 100 + self.rng.randrange(0, 40_000)
+                    base = 100 + _det_int(self.base_seed, "jpy", *key) % 40_000
                     fraction = 50 if base % 2 == 1 else 0
                     true_hundredths = sign * (base * 100 + fraction)
                     magnitude = abs(round_half_even(true_hundredths, 100))
@@ -232,8 +294,15 @@ class LegacyCore:
     # -- end of day -----------------------------------------------------------
 
     def _open_hold_total(self, account_id: str, at: dt.datetime) -> int:
+        """Holds that are placed and not yet expired at ``at``.
+
+        The placed_at test matters: a hold placed at 18:00 is not reserving
+        anything at the 17:00 snapshot earlier the same day.
+        """
         return sum(
-            h.amount_minor for h in self._holds if h.account_id == account_id and h.expires_at > at
+            h.amount_minor
+            for h in self._holds
+            if h.account_id == account_id and h.placed_at <= at < h.expires_at
         )
 
     def place_hold(
@@ -252,23 +321,33 @@ class LegacyCore:
 
     def run_day(self, d: dt.date) -> DayResult:
         """Apply one business day and return the transactions and EOD balances."""
-        raw = self.generate_day(d)
+        raw = self.generate_day(d) + self._carried
+        self._carried = []
         txns = self.quirks.transform_transactions(raw)
         # Only transactions the legacy core assigned to THIS business date land
-        # today; Q2 and Q5 move some of them.
+        # today; Q2 and Q5 move some of them. Anything dated later is carried.
         today = [t for t in txns if t.business_date == d]
+        self._carried = sorted(
+            (t for t in txns if t.business_date > d), key=lambda t: (t.posted_at, t.txn_id)
+        )
 
         for t in today:
             self._ledger[t.account_id] = self._ledger.get(t.account_id, 0) + t.amount_minor
 
-        # A hold on the first account every day, so Q8 has something to expire.
-        if self.accounts:
-            a = self.accounts[0]
+        # A hold on every account each day, placed at 18:00 deliberately.
+        #
+        # Q8 expires holds at midnight on placement + 3; the documented rule
+        # expires them 72 hours after placement. The two therefore disagree only
+        # between midnight and 18:00 on that third day. A position snapshot
+        # taken at 23:59 sees both already expired and Q8 becomes invisible at
+        # every grain -- which is what the first version of this did.
+        for a in self.accounts:
             self.place_hold(
-                a.account_id, a.currency, 5_000, dt.datetime.combine(d, dt.time(10, 0, 0))
+                a.account_id, a.currency, HOLD_MINOR, dt.datetime.combine(d, dt.time(18, 0, 0))
             )
 
-        eod_instant = dt.datetime.combine(d, dt.time(23, 59, 59))
+        # Positions are reported as at the documented cut-off, not midnight.
+        eod_instant = dt.datetime.combine(d, dt.time(17, 0, 0))
 
         # Interest for the month just ended. The TRIGGER is the first business
         # day of the month; the posting DATE is the core's own rule (Q12).
@@ -350,6 +429,12 @@ class LegacyCore:
                 basis = self.quirks.min_balance_basis(ledger, available)
                 if basis < int(p["min_balance_minor"]):
                     fee += threshold
+            # The shared service fee, split two ways. An odd total means each
+            # share is exactly x.5 -- the tie where Q1's half-up and the
+            # documented half-even part company.
+            if a.product_code != "SUSPENSE":
+                fee += self.quirks.interest_rounding(SHARED_FEE_MINOR, 2)
+
             if fee:
                 self._ledger[a.account_id] = self._ledger.get(a.account_id, 0) - fee
                 out.append(
@@ -370,5 +455,16 @@ class LegacyCore:
     # -- windows --------------------------------------------------------------
 
     def run_window(self, w: Window) -> list[DayResult]:
-        """Run every business day of a window, in order."""
-        return [self.run_day(d) for d in w.business_days(self.cal)]
+        """Run every day the LEGACY CORE considers a business day.
+
+        Not the documented calendar: Q5 is the legacy core treating Columbus Day
+        as a business day, so iterating the documented calendar would skip the
+        single day on which Q5 exists and report it as undetected.
+        """
+        out: list[DayResult] = []
+        d = w.start
+        while d <= w.end:
+            if self.quirks.is_business_day(d):
+                out.append(self.run_day(d))
+            d += dt.timedelta(days=1)
+        return out

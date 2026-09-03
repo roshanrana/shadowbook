@@ -54,14 +54,25 @@ def test_accounts_are_deterministic_and_straddle_the_grandfather_date() -> None:
     assert before and after, "Q4's waiver needs accounts on both sides of 2019-01-01"
 
 
-def test_both_windows_write_the_expected_number_of_files(tmp_path: Path) -> None:
-    s1 = run_window(W1, SEED, QUIRKS, tmp_path)
-    s2 = run_window(W2, SEED, QUIRKS, tmp_path)
-    assert s1["business_days"] == 30
-    assert s2["business_days"] == 9
-    # One TXN and one BAL file per business day.
-    assert len(list((tmp_path / "W1").glob("*.txt"))) == 60
-    assert len(list((tmp_path / "W2").glob("*.txt"))) == 18
+def test_windows_write_one_txn_and_one_bal_file_per_legacy_business_day(tmp_path: Path) -> None:
+    """The LEGACY core's business days, not the documented calendar's.
+
+    W2 spans 9 documented business days but the quirked core produces 10, because
+    Q5 has it treating Columbus Day as a working day. That extra file is the only
+    place Q5 exists -- if the simulator iterated the documented calendar it would
+    never run on 2028-10-09 and Q5 would be permanently undetectable.
+    """
+    quirked_w1 = run_window(W1, SEED, QUIRKS, tmp_path / "q")
+    quirked_w2 = run_window(W2, SEED, QUIRKS, tmp_path / "q")
+    control_w2 = run_window(W2, SEED, QUIRKS, tmp_path / "c", documented_only=True)
+
+    assert quirked_w1["business_days"] == 30
+    assert control_w2["business_days"] == 9, "the documented calendar excludes Columbus Day"
+    assert quirked_w2["business_days"] == 10, "Q5 adds Columbus Day to the legacy core's calendar"
+
+    assert len(list((tmp_path / "q" / "W1").glob("*.txt"))) == 60
+    assert len(list((tmp_path / "q" / "W2").glob("*.txt"))) == 20
+    assert len(list((tmp_path / "c" / "W2").glob("*.txt"))) == 18
 
 
 def test_the_control_run_disables_every_quirk(tmp_path: Path) -> None:
