@@ -1,0 +1,6 @@
+# Optional Codex/ChatGPT metadata for this skill
+interface:
+  display_name: "Enterprise Dev Lifecycle"
+  short_description: "Gated design → plan → build → validate → ship workflow for enterprise-grade apps built with AI agents."
+  default_prompt: "Use the enterprise-dev-lifecycle skill to build this project end to end, starting with the requirements interview."
+allow_implicit_invocation: true

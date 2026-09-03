@@ -24,7 +24,7 @@ Two goals drive everything in this skill:
    must reply with an explicit "approved" (or equivalent unambiguous confirmation)
    at the Phase 3 gate. "Looks good, but…" is not approval — resolve the "but" first.
 2. **Present every design gate as a decision.** End each design phase with: the
-   document location, a <=10-line summary, any open questions (numbered), and the
+   document location, a ≤10-line summary, any open questions (numbered), and the
    literal question: *"Reply 'approved' to proceed, or tell me what to change."*
 3. **All state lives in files.** `STATE.md`, the design docs, and task packs are the
    single source of truth. Assume chat history will be lost at any moment.
@@ -148,7 +148,7 @@ most, active at all times:
 - **Specs are frozen:** cite `03-lld.md §x` instead of re-deriving or re-debating
   decisions. Re-opening a decision is a plan change, not a mid-task tangent.
 - **Write small:** targeted edits over file rewrites; never echo file contents back
-  into the conversation; keep handoff notes <=10 lines.
+  into the conversation; keep handoff notes ≤10 lines.
 - **Batch questions:** questions go to gates. Mid-task blockers get written to the
   task file, the task gets marked `blocked`, and you move to the next unblocked task.
 - **Scripts over reasoning:** deterministic work (checks, codegen, migrations,

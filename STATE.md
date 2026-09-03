@@ -12,7 +12,7 @@ To pass the gate, the next session must:
 
 1. Resolve the one open requirements defect below (accrual basis).
 2. Obtain the owner's explicit approval of `01-requirements.md`.
-3. Mark Phase 0 complete here, then begin Phase 1 (HLD) — read `.claude/skills/enterprise-dev-lifecycle/references/design-templates.md` first. **That file does not exist yet** (see Blockers).
+3. Mark Phase 0 complete here, then begin Phase 1 (HLD) — read `.claude/skills/enterprise-dev-lifecycle/references/design-templates.md` first.
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
 
@@ -55,7 +55,7 @@ _(empty — tasks are created in Phase 3)_
 
 ## Blockers
 
-- **B-001 — `enterprise-dev-lifecycle/references/` is missing.** `.claude/skills/enterprise-dev-lifecycle/SKILL.md` is installed (copied from the account-synced skill, which ships SKILL.md only). The five reference files are absent: `design-templates.md` (needed at Phase 1 **and** Phase 2), `execution-planning.md` (Phase 3), `context-engineering.md` and `orchestration.md` (Phase 5), `validation-shipping.md` (Phases 4, 6, 7). **Blocks Phase 1.** Fix: unzip `enterprise-dev-lifecycle.zip` into that directory, then delete its README.
+_(none — B-001 resolved 2026-09-03: the full `enterprise-dev-lifecycle` skill is installed at `.claude/skills/enterprise-dev-lifecycle/` — SKILL.md, all five `references/`, and `agents/openai.yaml` — verified byte-identical to `~/Downloads/enterprise-dev-lifecycle.zip`. Note: the copy synced to the Claude account ships SKILL.md only, so always take this skill from the repo, not the account.)_
 
 ## Deviations from approved design
 
