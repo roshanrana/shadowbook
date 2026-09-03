@@ -62,7 +62,7 @@ func TestBasesDivergeOrQuirksAreUndetectable(t *testing.T) {
 	if act365 == actact {
 		t.Fatal("ACT/365 and ACT/ACT agree in a leap year: Q6 would be undetectable")
 	}
-	if !(act360 > act365 && act365 > actact) {
+	if act360 <= act365 || act365 <= actact {
 		t.Fatalf("expected ACT/360 > ACT/365 > ACT/ACT, got %d, %d, %d", act360, act365, actact)
 	}
 }
