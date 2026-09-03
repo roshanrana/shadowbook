@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 # The documented daily cut-off: 17:00:00.000, EXCLUSIVE. An instant strictly
 # before it belongs to that day's business date; an instant at or after it rolls
@@ -22,7 +22,7 @@ from enum import Enum
 CUTOFF = dt.time(17, 0, 0, 0)
 
 
-class Basis(str, Enum):
+class Basis(StrEnum):
     """Day-count conventions.
 
     ACT365 and ACTACT are documented shadow behaviour (FR-L6). ACT360 is NOT --
