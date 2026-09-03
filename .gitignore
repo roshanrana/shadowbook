@@ -1,0 +1,10 @@
+.env
+*.log
+/reports/*.raw
+/tmp/
+__pycache__/
+.venv/
+*.pyc
+bin/
+coverage.out
+.DS_Store

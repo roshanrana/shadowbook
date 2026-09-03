@@ -1,0 +1,124 @@
+# SHADOWBOOK — legacy-sim quirk seed
+# Each quirk is applied silently by legacy-sim when enabled. The shadow ledger
+# implements the "documented" behaviour. The reconciler must surface the break.
+# Keep this file as the single source of truth for quirk definitions; the
+# time-to-discovery report keys on `id`.
+
+version: 1
+default_seed: 20260903
+
+quirks:
+  - id: Q1
+    name: interest_rounding_half_up
+    enabled: true
+    legacy: "round half-up to minor units"
+    documented: "round half-even"
+    cadence: daily
+    expected_grain: account_day
+    params: {}
+
+  - id: Q2
+    name: cutoff_inclusive_boundary
+    enabled: true
+    legacy: "transactions at 16:59:59.999 belong to the next business day"
+    documented: "cut-off is 17:00:00.000 exclusive"
+    cadence: daily
+    expected_grain: transaction
+    params:
+      legacy_cutoff: "16:59:59.999"
+      documented_cutoff: "17:00:00.000"
+
+  - id: Q3
+    name: accrual_basis_act360_on_product
+    enabled: true
+    legacy: "ACT/360 on product SAV-01"
+    documented: "ACT/365 on all products"
+    cadence: daily
+    expected_grain: account_day
+    params:
+      product_code: SAV-01
+
+  - id: Q4
+    name: grandfathered_fee_waiver
+    enabled: true
+    legacy: "monthly fee waived for accounts opened before 2019-01-01"
+    documented: "fee applies to all accounts"
+    cadence: month_end
+    expected_grain: account_day
+    params:
+      opened_before: "2019-01-01"
+
+  - id: Q5
+    name: columbus_day_is_business_day
+    enabled: true
+    legacy: "Columbus Day is a business day"
+    documented: "Columbus Day is a holiday"
+    cadence: annual_october
+    expected_grain: transaction
+    params: {}
+
+  - id: Q6
+    name: leap_day_accrual_act365
+    enabled: true
+    legacy: "leap years accrue on ACT/365 (366th day accrues)"
+    documented: "ACT/ACT in leap years"
+    cadence: leap_year
+    expected_grain: account_day
+    params: {}
+
+  - id: Q7
+    name: min_balance_fee_on_ledger_balance
+    enabled: true
+    legacy: "minimum-balance fee assessed on ledger balance"
+    documented: "assessed on available balance"
+    cadence: month_end
+    expected_grain: account_day
+    params: {}
+
+  - id: Q8
+    name: hold_expiry_midnight_n_plus_3
+    enabled: true
+    legacy: "holds expire at midnight on placement day + 3"
+    documented: "holds expire 72 hours after placement"
+    cadence: daily
+    expected_grain: account_day
+    params: {}
+
+  - id: Q9
+    name: reversal_deletes_original
+    enabled: true
+    legacy: "a reversal deletes the original entry"
+    documented: "a reversal posts a contra entry referencing the original"
+    cadence: daily
+    expected_grain: transaction
+    note: "Invisible at control-total grain by design."
+    params: {}
+
+  - id: Q10
+    name: jpy_two_decimals_truncated
+    enabled: true
+    legacy: "JPY stored with scale 2 and truncated"
+    documented: "JPY scale 0"
+    cadence: daily
+    expected_grain: transaction
+    params:
+      currency: JPY
+
+  - id: Q11
+    name: duplicate_suppression_60s
+    enabled: true
+    legacy: "same amount + same counterparty within 60 s silently dropped"
+    documented: "no suppression; duplicates are the client's responsibility"
+    cadence: daily
+    expected_grain: transaction
+    params:
+      window_seconds: 60
+
+  - id: Q12
+    name: interest_posted_first_business_day
+    enabled: true
+    legacy: "interest posted on first business day of the month"
+    documented: "posted on calendar first of the month"
+    cadence: month_boundary
+    expected_grain: account_day
+    params: {}

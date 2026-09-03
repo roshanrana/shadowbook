@@ -1,0 +1,9 @@
+{
+  "_comment": "Rename to .mcp.json to enable project-scoped MCP servers in Claude Code. GitHits is already connected to your Claude account; adding it here lets Claude Code verify current franz-go / Redpanda / k6 APIs before coding against them. Add a Postgres MCP only if you want Claude Code querying the ledger DB directly during runs.",
+  "mcpServers": {
+    "githits": {
+      "type": "http",
+      "url": "https://mcp.githits.com"
+    }
+  }
+}

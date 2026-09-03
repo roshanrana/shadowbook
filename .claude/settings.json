@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make *)", "Bash(go build *)", "Bash(go test *)", "Bash(go vet *)", "Bash(go mod *)",
+      "Bash(gofmt *)", "Bash(golangci-lint *)", "Bash(govulncheck *)",
+      "Bash(uv *)", "Bash(ruff *)", "Bash(mypy *)", "Bash(pytest *)",
+      "Bash(docker compose *)", "Bash(docker ps *)", "Bash(docker logs *)",
+      "Bash(buf *)", "Bash(protoc *)",
+      "Bash(git status *)", "Bash(git diff *)", "Bash(git add *)", "Bash(git commit *)", "Bash(git log *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)", "Bash(rm -rf /*)", "Bash(docker system prune*)"
+    ]
+  }
+}

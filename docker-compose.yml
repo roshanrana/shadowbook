@@ -1,0 +1,97 @@
+# SHADOWBOOK infrastructure. Two profiles:
+#   single — one broker, for `make check` and local dev
+#   chaos  — three brokers, for ablation runs
+# Application services are added in Phase 4 per the LLD. Pin image tags at that point.
+# No credentials here; see .env.example.
+
+x-redpanda: &redpanda
+  image: redpandadata/redpanda:latest
+  # Broker-level durability defaults are set per profile below; producers set acks=all.
+
+services:
+  pg-ledger:
+    image: postgres:16
+    profiles: [single, chaos]
+    environment:
+      POSTGRES_USER: ${LEDGER_DB_USER:-shadowbook}
+      POSTGRES_PASSWORD: ${LEDGER_DB_PASSWORD:-shadowbook}
+      POSTGRES_DB: ledger
+    ports: ["5433:5432"]
+    volumes: [pg-ledger:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LEDGER_DB_USER:-shadowbook}"]
+      interval: 5s
+      retries: 10
+
+  pg-recon:
+    image: postgres:16
+    profiles: [single, chaos]
+    environment:
+      POSTGRES_USER: ${RECON_DB_USER:-shadowbook}
+      POSTGRES_PASSWORD: ${RECON_DB_PASSWORD:-shadowbook}
+      POSTGRES_DB: recon
+    ports: ["5434:5432"]
+    volumes: [pg-recon:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RECON_DB_USER:-shadowbook}"]
+      interval: 5s
+      retries: 10
+
+  redpanda-0:
+    <<: *redpanda
+    profiles: [single, chaos]
+    command:
+      - redpanda start
+      - --smp 1 --memory 512M --overprovisioned
+      - --node-id 0
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda-0:9092,external://localhost:19092
+      - --rpc-addr redpanda-0:33145
+      - --advertise-rpc-addr redpanda-0:33145
+    ports: ["19092:19092"]
+    volumes: [rp-0:/var/lib/redpanda/data]
+
+  redpanda-1:
+    <<: *redpanda
+    profiles: [chaos]
+    command:
+      - redpanda start
+      - --smp 1 --memory 512M --overprovisioned
+      - --node-id 1
+      - --seeds redpanda-0:33145
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:29092
+      - --advertise-kafka-addr internal://redpanda-1:9092,external://localhost:29092
+      - --rpc-addr redpanda-1:33145
+      - --advertise-rpc-addr redpanda-1:33145
+    ports: ["29092:29092"]
+    volumes: [rp-1:/var/lib/redpanda/data]
+    depends_on: [redpanda-0]
+
+  redpanda-2:
+    <<: *redpanda
+    profiles: [chaos]
+    command:
+      - redpanda start
+      - --smp 1 --memory 512M --overprovisioned
+      - --node-id 2
+      - --seeds redpanda-0:33145
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:39092
+      - --advertise-kafka-addr internal://redpanda-2:9092,external://localhost:39092
+      - --rpc-addr redpanda-2:33145
+      - --advertise-rpc-addr redpanda-2:33145
+    ports: ["39092:39092"]
+    volumes: [rp-2:/var/lib/redpanda/data]
+    depends_on: [redpanda-0]
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: [single, chaos]
+    ports: ["9090:9090"]
+    volumes: ["./scripts/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+
+volumes:
+  pg-ledger: {}
+  pg-recon: {}
+  rp-0: {}
+  rp-1: {}
+  rp-2: {}
