@@ -54,15 +54,21 @@ def test_business_days_match_go(cal: Calendar, golden: dict[str, list[dict[str, 
         if cal.is_business_day(d) != fact["is_business_day"]:
             mismatches.append(f"{d}: python={cal.is_business_day(d)} go={fact['is_business_day']}")
         if cal.holiday_name(d) != (fact.get("holiday") or None):
-            mismatches.append(f"{d}: holiday python={cal.holiday_name(d)!r} go={fact.get('holiday')!r}")
+            mismatches.append(
+                f"{d}: holiday python={cal.holiday_name(d)!r} go={fact.get('holiday')!r}"
+            )
     assert not mismatches, "calendar drift between Go and Python:\n" + "\n".join(mismatches[:20])
 
 
-def test_month_boundaries_match_go(cal: Calendar, golden: dict[str, list[dict[str, object]]]) -> None:
+def test_month_boundaries_match_go(
+    cal: Calendar, golden: dict[str, list[dict[str, object]]]
+) -> None:
     for fact in golden["months"]:
         y, m = int(fact["year"]), int(fact["month"])  # type: ignore[arg-type]
         assert cal.first_of_month(y, m).isoformat() == fact["first_of_month"]
-        assert cal.first_business_day_of_month(y, m).isoformat() == fact["first_business_day_of_month"]
+        assert (
+            cal.first_business_day_of_month(y, m).isoformat() == fact["first_business_day_of_month"]
+        )
 
 
 def test_cutoff_matches_go(cal: Calendar, golden: dict[str, list[dict[str, object]]]) -> None:
