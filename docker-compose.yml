@@ -1,97 +1,157 @@
-# SHADOWBOOK infrastructure. Two profiles:
-#   single — one broker, for `make check` and local dev
-#   chaos  — three brokers, for ablation runs
-# Application services are added in Phase 4 per the LLD. Pin image tags at that point.
-# No credentials here; see .env.example.
+# SHADOWBOOK compose. Two profiles:
+#   single -- one broker, two Postgres, Prometheus. Everything except ablation.
+#   chaos  -- three brokers with the NFR-9 durability settings, for Finding 2.
+#
+# Images are pinned to immutable patch tags and MUST be re-pinned to digests
+# before the repo goes public: run scripts/pin-digests.sh. See decisions.md
+# D-017 for why they are not digests already.
 
-x-redpanda: &redpanda
-  image: redpandadata/redpanda:latest
-  # Broker-level durability defaults are set per profile below; producers set acks=all.
+x-pg-common: &pg-common
+  image: postgres:16.13-bookworm
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+
+# NFR-9 is FIXED for every run and is asserted by a test, not just written here:
+# acks=all (producer side, T-013), RF=3, min.insync.replicas=2, unclean leader
+# election off. Changing any of these invalidates every ablation artefact.
+x-redpanda-common: &redpanda-common
+  image: redpandadata/redpanda:v24.3.6
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+    interval: 10s
+    timeout: 5s
+    retries: 20
 
 services:
-  pg-ledger:
-    image: postgres:16
-    profiles: [single, chaos]
+  ledger-db:
+    <<: *pg-common
+    profiles: ["single", "chaos"]
     environment:
       POSTGRES_USER: ${LEDGER_DB_USER:-shadowbook}
-      POSTGRES_PASSWORD: ${LEDGER_DB_PASSWORD:-shadowbook}
+      POSTGRES_PASSWORD: ${LEDGER_DB_PASSWORD:?set LEDGER_DB_PASSWORD in .env}
       POSTGRES_DB: ledger
     ports: ["5433:5432"]
-    volumes: [pg-ledger:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${LEDGER_DB_USER:-shadowbook}"]
-      interval: 5s
-      retries: 10
+    volumes: ["ledger-data:/var/lib/postgresql/data"]
 
-  pg-recon:
-    image: postgres:16
-    profiles: [single, chaos]
+  recon-db:
+    <<: *pg-common
+    profiles: ["single", "chaos"]
     environment:
       POSTGRES_USER: ${RECON_DB_USER:-shadowbook}
-      POSTGRES_PASSWORD: ${RECON_DB_PASSWORD:-shadowbook}
+      POSTGRES_PASSWORD: ${RECON_DB_PASSWORD:?set RECON_DB_PASSWORD in .env}
       POSTGRES_DB: recon
     ports: ["5434:5432"]
-    volumes: [pg-recon:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${RECON_DB_USER:-shadowbook}"]
-      interval: 5s
-      retries: 10
+    volumes: ["recon-data:/var/lib/postgresql/data"]
 
-  redpanda-0:
-    <<: *redpanda
-    profiles: [single, chaos]
+  # --- single-broker profile -------------------------------------------------
+  redpanda:
+    <<: *redpanda-common
+    profiles: ["single"]
     command:
-      - redpanda start
-      - --smp 1 --memory 512M --overprovisioned
-      - --node-id 0
-      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
-      - --advertise-kafka-addr internal://redpanda-0:9092,external://localhost:19092
-      - --rpc-addr redpanda-0:33145
-      - --advertise-rpc-addr redpanda-0:33145
-    ports: ["19092:19092"]
-    volumes: [rp-0:/var/lib/redpanda/data]
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://localhost:9092
+      - --set=redpanda.default_topic_replications=1
+      - --set=redpanda.unclean_leader_election_enabled=false
+    ports: ["9092:9092", "9644:9644"]
 
-  redpanda-1:
-    <<: *redpanda
-    profiles: [chaos]
+  # --- chaos profile: three brokers, RF=3, min.insync.replicas=2 -------------
+  redpanda-1: &rp1
+    <<: *redpanda-common
+    profiles: ["chaos"]
     command:
-      - redpanda start
-      - --smp 1 --memory 512M --overprovisioned
-      - --node-id 1
-      - --seeds redpanda-0:33145
-      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:29092
-      - --advertise-kafka-addr internal://redpanda-1:9092,external://localhost:29092
-      - --rpc-addr redpanda-1:33145
-      - --advertise-rpc-addr redpanda-1:33145
-    ports: ["29092:29092"]
-    volumes: [rp-1:/var/lib/redpanda/data]
-    depends_on: [redpanda-0]
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=1
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda-1:9092
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=redpanda-1:33145
+      - --set=redpanda.default_topic_replications=3
+      - --set=redpanda.minimum_topic_replications=3
+      - --set=redpanda.unclean_leader_election_enabled=false
+      - --set=redpanda.enable_transactions=true
+      - --set=redpanda.enable_idempotence=true
+    ports: ["19092:9092"]
 
   redpanda-2:
-    <<: *redpanda
-    profiles: [chaos]
+    <<: *redpanda-common
+    profiles: ["chaos"]
     command:
-      - redpanda start
-      - --smp 1 --memory 512M --overprovisioned
-      - --node-id 2
-      - --seeds redpanda-0:33145
-      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:39092
-      - --advertise-kafka-addr internal://redpanda-2:9092,external://localhost:39092
-      - --rpc-addr redpanda-2:33145
-      - --advertise-rpc-addr redpanda-2:33145
-    ports: ["39092:39092"]
-    volumes: [rp-2:/var/lib/redpanda/data]
-    depends_on: [redpanda-0]
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=2
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda-2:9092
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=redpanda-2:33145
+      - --seeds=redpanda-1:33145
+      - --set=redpanda.default_topic_replications=3
+      - --set=redpanda.minimum_topic_replications=3
+      - --set=redpanda.unclean_leader_election_enabled=false
+      - --set=redpanda.enable_transactions=true
+      - --set=redpanda.enable_idempotence=true
+    ports: ["29092:9092"]
+    depends_on: [redpanda-1]
+
+  redpanda-3:
+    <<: *redpanda-common
+    profiles: ["chaos"]
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=3
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda-3:9092
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=redpanda-3:33145
+      - --seeds=redpanda-1:33145
+      - --set=redpanda.default_topic_replications=3
+      - --set=redpanda.minimum_topic_replications=3
+      - --set=redpanda.unclean_leader_election_enabled=false
+      - --set=redpanda.enable_transactions=true
+      - --set=redpanda.enable_idempotence=true
+    ports: ["39092:9092"]
+    depends_on: [redpanda-1]
 
   prometheus:
-    image: prom/prometheus:latest
-    profiles: [single, chaos]
+    image: prom/prometheus:v3.1.0
+    profiles: ["single", "chaos"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2h
+    volumes:
+      - ./scripts/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports: ["9090:9090"]
-    volumes: ["./scripts/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
 
 volumes:
-  pg-ledger: {}
-  pg-recon: {}
-  rp-0: {}
-  rp-1: {}
-  rp-2: {}
+  ledger-data:
+  recon-data:
