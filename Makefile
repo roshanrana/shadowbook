@@ -10,8 +10,27 @@ UV ?= uv
 # Integration tests need a PostgreSQL. `make up` provides one; CI provides one
 # as a service. When unset, integration tests skip loudly rather than fail.
 RUN_DIR ?= reports/runs/demo
-LEDGER_DSN ?= postgres://shadowbook:shadowbook@localhost:5433/ledger?sslmode=disable
-RECON_DSN  ?= postgres://shadowbook:shadowbook@localhost:5434/recon?sslmode=disable
+
+# The DSNs are BUILT from the same variables compose passes to Postgres, and
+# .env is loaded here so there is one source of truth for the credentials.
+#
+# They used to hardcode `shadowbook:shadowbook`, while compose took the
+# password from ${LEDGER_DB_PASSWORD} in .env -- which .env.example ships as
+# `change-me`. So the documented path (cp .env.example .env; make up; make
+# check) failed password authentication on every fresh clone. It went unnoticed
+# because every environment this had run in created Postgres some other way,
+# with a password that happened to match the hardcoded string.
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+LEDGER_DB_USER ?= shadowbook
+LEDGER_DB_PASSWORD ?= shadowbook
+RECON_DB_USER ?= shadowbook
+RECON_DB_PASSWORD ?= shadowbook
+
+LEDGER_DSN ?= postgres://$(LEDGER_DB_USER):$(LEDGER_DB_PASSWORD)@localhost:5433/ledger?sslmode=disable
+RECON_DSN  ?= postgres://$(RECON_DB_USER):$(RECON_DB_PASSWORD)@localhost:5434/recon?sslmode=disable
 
 help: ## List targets
 	@grep -E "^[a-zA-Z_-]+:.*?## " $(MAKEFILE_LIST) | awk -F":.*?## " "{printf \"  %-16s %s\n\", \$$1, \$$2}"

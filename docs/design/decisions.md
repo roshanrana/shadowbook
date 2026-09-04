@@ -196,3 +196,10 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 2. `golang.org/x/crypto` rose v0.31.0 → v0.38.0, as D-020 predicted, along with `x/sync`, `x/sys` and `x/text`. All are forward moves.
 3. The `// indirect` block now exists, which `go.mod` had been missing entirely.
 Verified after adopting the tidied module: `go build ./...`, `golangci-lint` (0 issues) and the full unit suite all pass. `scripts/dev-workspace.sh` needed two fixes to cope — it hard-coded `go 1.23` in the generated workspace, which Go rejects outright when the module requires more, and its error extractor matched a fixed list of vanity hosts and broke on the first new one (`gonum.org`, via vegeta's tdigest). Both are now derived rather than hard-coded.
+
+## D-028 — Credentials have one source of truth, and it is `.env`
+
+**Status:** accepted (implementation, 2026-09-04) — **defect in the documented setup path**
+**Context:** `docker-compose.yml` passes `${LEDGER_DB_PASSWORD}` to Postgres and refuses to start without it; `.env.example` ships that variable as `change-me`; the `Makefile` hardcoded `postgres://shadowbook:shadowbook@...`. The documented path in SETUP.md — `cp .env.example .env`, `make up`, `make check` — therefore fails password authentication on every fresh clone. It was found the first time anyone brought the stack up from the documented instructions rather than from a script.
+**Decision:** The Makefile loads `.env` and builds both DSNs from the same variables compose uses, with `shadowbook` as the fallback when no `.env` exists (which keeps CI and the sandbox working unchanged).
+**Consequences:** One source of truth for the credentials. The reason this survived so long is worth recording: every environment the project had run in created PostgreSQL by some other means — a sandbox script that set the password to `shadowbook` directly, and CI service containers — so the hardcoded string happened to be correct everywhere except the one path the documentation describes. A setup step that only ever runs in environments it was not written for is not evidence that it works.
