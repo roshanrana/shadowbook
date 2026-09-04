@@ -78,6 +78,70 @@ def _best_rows(finding: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _median(values: list[int]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    if n % 2:
+        return float(ordered[mid])
+    return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _attribution(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Separate 'something is wrong' from 'this is what is wrong'.
+
+    These are different results and the per-quirk table reports them in two
+    different columns, which makes the gap between them easy to miss: the
+    headline count answers only the first question. Operationally the second is
+    the expensive one -- a migration team that knows a break exists but not
+    which behaviour caused it still has to go and find out.
+    """
+    detected = [r for r in rows if r["detected"]]
+    isolated = [r for r in detected if r.get("breaks_to_isolate") is not None]
+    days = [
+        r["first_detected_business_day"]
+        for r in detected
+        if r.get("first_detected_business_day") is not None
+    ]
+    return {
+        "detected": len(detected),
+        "total": len(rows),
+        "isolated": len(isolated),
+        "isolated_ids": [r["quirk_id"] for r in isolated],
+        "unattributed_ids": [r["quirk_id"] for r in detected if r not in isolated],
+        "median_days": _median(days),
+        "worst_days": max(days) if days else 0,
+        "best_days": min(days) if days else 0,
+    }
+
+
+def _cadence_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Group time-to-discovery by the quirk's own cadence.
+
+    A quirk that only fires at month end cannot be discovered before month end
+    however good the reconciler is, so a single median over all twelve quirks
+    is a statistic about the cadence mix, not about detection sensitivity.
+    Splitting them is what makes the numbers comparable.
+    """
+    by_cadence: dict[str, list[int]] = {}
+    for r in rows:
+        day = r.get("first_detected_business_day")
+        if not r["detected"] or day is None:
+            continue
+        by_cadence.setdefault(r["cadence"], []).append(day)
+    return {
+        cadence: {
+            "count": len(days),
+            "median": _median(days),
+            "min": min(days),
+            "max": max(days),
+        }
+        for cadence, days in sorted(by_cadence.items())
+    }
+
+
 def build_context(
     finding1_path: Path, finding2_path: Path | None, repo: Path, generated_at: str
 ) -> dict[str, Any]:
@@ -110,6 +174,8 @@ def build_context(
             finding2_reason = str(payload.get("reason", finding2_reason))
 
     return {
+        "attribution": _attribution(rows),
+        "cadence_floor": _cadence_floor(rows),
         "header": {
             "git_sha": git_sha(repo),
             "seed": finding["seed"],

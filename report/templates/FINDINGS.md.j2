@@ -34,7 +34,61 @@ detected. Undetected quirks are shown, not hidden.
 Undetected: {{ finding1_undetected | join(", ") }}.
 {% endif %}
 
-### Finding 1b — the same quirks, all twelve enabled at once
+### Finding 1a — detection is not attribution
+
+Detecting a break and naming its cause are different results, and the gap
+between them is the one that costs a migration team time.
+
+| | |
+|---|---|
+| Detected at all | **{{ attribution.detected }} of {{ attribution.total }}** |
+| Isolated to a single quirk | **{{ attribution.isolated }} of {{ attribution.detected }}** ({{ attribution.isolated_ids | join(", ") }}) |
+| Detected but not attributable | {{ attribution.unattributed_ids | join(", ") }} |
+| Business days to first detection | median {{ attribution.median_days }}, range {{ attribution.best_days }}–{{ attribution.worst_days }} |
+
+Reconciliation is good at the first question and weak at the second. Every
+seeded behaviour surfaced, most within the first working week — but only
+{{ attribution.isolated }} of the {{ attribution.detected }} produced a break
+signature naming exactly one quirk. The rest announced that the twin and the
+core disagreed without saying which behaviour caused it.
+
+The reason is structural, not a tuning problem. Signatures are integer
+predicates over a delta — a one-minor-unit rounding difference, a scale-of-100
+difference, a delta equal to one whole movement — and distinct behaviours
+produce the same delta shape. A rounding quirk and a day-count quirk are both
+"off by one minor unit" whenever the balance is small enough that the day-count
+ratio does not survive rounding. More rules would not fix this: the information
+needed to separate them is not in the delta.
+
+For a migration this sets the honest expectation. Continuous reconciliation is a
+tripwire, not a diagnosis. It says within days that a behaviour differs; in most
+cases someone still has to read the legacy code to find out why.
+
+### Finding 1b — time-to-discovery is floored by cadence, not by sensitivity
+
+| Cadence | Quirks | Median business day | Range |
+|---|---|---|---|
+{% for cadence, s in cadence_floor.items() -%}
+| `{{ cadence }}` | {{ s.count }} | {{ s.median }} | {{ s.min }}–{{ s.max }} |
+{% endfor %}
+
+A quirk that only fires at month end cannot be found before month end, however
+sensitive the reconciler is. The daily quirks surface almost immediately; the
+slow ones are slow because of when they happen, not because they are subtle.
+
+The `month_end` range looks like a counter-example and is worth reading
+carefully: one of its two quirks is found on business day 2, the other on day
+25. Both behave identically. W1 opens on 2028-02-28, so a month end — the leap
+day — falls on business day 2, and the next one not until day 25. The spread is
+entirely an artefact of where the window was placed relative to the calendar.
+
+That is the sharper version of the point. Window **length** is not the only
+thing that matters; window **placement** does too. A four-week pilot that
+happens to sit between two month ends exercises none of the month-end
+behaviour and reports clean. Cadence should size the window, and the calendar
+should place it.
+
+### Finding 1c — the same quirks, all twelve enabled at once
 
 {% for window, row in combined.items() %}
 **{{ window }}** — {{ row.total_breaks }} breaks over {{ row.business_days }} business days

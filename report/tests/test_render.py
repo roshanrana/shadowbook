@@ -72,3 +72,77 @@ def test_the_header_carries_everything_needed_to_reproduce(artefact: Path) -> No
     body = build(artefact)
     for field in ("Git SHA", "Seed", "Windows", "Go / Python", "PostgreSQL", "Machine"):
         assert f"| {field} |" in body
+
+
+def test_attribution_separates_detection_from_isolation() -> None:
+    """Detected-but-unattributable must not be counted as isolated.
+
+    The whole point of Finding 1a is that these two numbers differ; a bug that
+    conflated them would make the section silently claim a stronger result.
+    """
+    rows = [
+        {
+            "quirk_id": "Q1",
+            "detected": True,
+            "breaks_to_isolate": 1,
+            "first_detected_business_day": 3,
+        },
+        {
+            "quirk_id": "Q2",
+            "detected": True,
+            "breaks_to_isolate": None,
+            "first_detected_business_day": 1,
+        },
+        {
+            "quirk_id": "Q3",
+            "detected": False,
+            "breaks_to_isolate": None,
+            "first_detected_business_day": None,
+        },
+    ]
+    from report.render import _attribution
+
+    a = _attribution(rows)
+    assert a["detected"] == 2
+    assert a["total"] == 3
+    assert a["isolated"] == 1
+    assert a["isolated_ids"] == ["Q1"]
+    assert a["unattributed_ids"] == ["Q2"]
+    # Undetected quirks contribute no day at all; including them as 0 would
+    # drag the median toward "found immediately", which is the opposite of true.
+    assert a["median_days"] == 2
+    assert a["best_days"] == 1
+    assert a["worst_days"] == 3
+
+
+def test_cadence_floor_groups_by_cadence_and_ignores_undetected() -> None:
+    rows = [
+        {"quirk_id": "Q1", "cadence": "daily", "detected": True, "first_detected_business_day": 1},
+        {"quirk_id": "Q2", "cadence": "daily", "detected": True, "first_detected_business_day": 3},
+        {
+            "quirk_id": "Q3",
+            "cadence": "month_end",
+            "detected": True,
+            "first_detected_business_day": 25,
+        },
+        {
+            "quirk_id": "Q4",
+            "cadence": "month_end",
+            "detected": False,
+            "first_detected_business_day": None,
+        },
+    ]
+    from report.render import _cadence_floor
+
+    c = _cadence_floor(rows)
+    assert c["daily"] == {"count": 2, "median": 2, "min": 1, "max": 3}
+    assert c["month_end"] == {"count": 1, "median": 25, "min": 25, "max": 25}
+
+
+def test_report_states_the_attribution_gap(artefact: Path) -> None:
+    """A reader must be able to see that 12-of-12 detected is not 12-of-12
+    explained, without inferring it from a column of 'not isolated'."""
+    out = build(artefact)
+    assert "detection is not attribution" in out
+    assert "Isolated to a single quirk" in out
+    assert "tripwire, not a diagnosis" in out

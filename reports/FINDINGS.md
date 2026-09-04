@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Git SHA | `4324066de0259c0da97bd42530e4e745e6c661f1` |
+| Git SHA | `64453e21ca11720b3038c5925fdbfcbcbba5ee7c` |
 | Seed | `20260903` |
 | Windows | W1, W2 |
 | Broker | Redpanda (not exercised in this run) |
@@ -40,7 +40,63 @@ detected. Undetected quirks are shown, not hidden.
 | Q12 | `interest_posted_first_business_day` | month_boundary | W1 | Y | 26 | transaction | 9 | not isolated |
 **Detected: 12 of 12.**
 
-### Finding 1b — the same quirks, all twelve enabled at once
+### Finding 1a — detection is not attribution
+
+Detecting a break and naming its cause are different results, and the gap
+between them is the one that costs a migration team time.
+
+| | |
+|---|---|
+| Detected at all | **12 of 12** |
+| Isolated to a single quirk | **3 of 12** (Q3, Q6, Q8) |
+| Detected but not attributable | Q1, Q2, Q4, Q5, Q7, Q9, Q10, Q11, Q12 |
+| Business days to first detection | median 2.5, range 1–26 |
+
+Reconciliation is good at the first question and weak at the second. Every
+seeded behaviour surfaced, most within the first working week — but only
+3 of the 12 produced a break
+signature naming exactly one quirk. The rest announced that the twin and the
+core disagreed without saying which behaviour caused it.
+
+The reason is structural, not a tuning problem. Signatures are integer
+predicates over a delta — a one-minor-unit rounding difference, a scale-of-100
+difference, a delta equal to one whole movement — and distinct behaviours
+produce the same delta shape. A rounding quirk and a day-count quirk are both
+"off by one minor unit" whenever the balance is small enough that the day-count
+ratio does not survive rounding. More rules would not fix this: the information
+needed to separate them is not in the delta.
+
+For a migration this sets the honest expectation. Continuous reconciliation is a
+tripwire, not a diagnosis. It says within days that a behaviour differs; in most
+cases someone still has to read the legacy code to find out why.
+
+### Finding 1b — time-to-discovery is floored by cadence, not by sensitivity
+
+| Cadence | Quirks | Median business day | Range |
+|---|---|---|---|
+| `annual_october` | 1 | 6.0 | 6–6 |
+| `daily` | 7 | 1.0 | 1–4 |
+| `leap_year` | 1 | 3.0 | 3–3 |
+| `month_boundary` | 1 | 26.0 | 26–26 |
+| `month_end` | 2 | 13.5 | 2–25 |
+
+A quirk that only fires at month end cannot be found before month end, however
+sensitive the reconciler is. The daily quirks surface almost immediately; the
+slow ones are slow because of when they happen, not because they are subtle.
+
+The `month_end` range looks like a counter-example and is worth reading
+carefully: one of its two quirks is found on business day 2, the other on day
+25. Both behave identically. W1 opens on 2028-02-28, so a month end — the leap
+day — falls on business day 2, and the next one not until day 25. The spread is
+entirely an artefact of where the window was placed relative to the calendar.
+
+That is the sharper version of the point. Window **length** is not the only
+thing that matters; window **placement** does too. A four-week pilot that
+happens to sit between two month ends exercises none of the month-end
+behaviour and reports clean. Cadence should size the window, and the calendar
+should place it.
+
+### Finding 1c — the same quirks, all twelve enabled at once
 
 **W1** — 1888 breaks over 31 business days
 (739 timing, 299 model-difference,
@@ -123,7 +179,7 @@ and are not claimed here.
 ## Reproduce
 
 ```
-git checkout 4324066de0259c0da97bd42530e4e745e6c661f1
+git checkout 64453e21ca11720b3038c5925fdbfcbcbba5ee7c
 cp .env.example .env
 make up
 make demo          # both windows, Finding 1
