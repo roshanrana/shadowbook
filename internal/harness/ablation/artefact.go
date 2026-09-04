@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/roshanrana/shadowbook/internal/harness/chaos"
@@ -117,6 +118,41 @@ func (e *ErrMismatchedParameters) Error() string {
 	return "ablation: refusing to render a table from mismatched runs: " + e.Detail
 }
 
+// BrokerFake is the BrokerVersion recorded by a run against an in-process
+// broker rather than a real cluster.
+//
+// Such runs are useful and are meant to exist: they exercise the orchestration
+// -- provisioning, load, draining, measurement, artefact writing -- on a
+// machine with no Docker. What they cannot do is produce Finding 2, which is a
+// measurement of a real cluster losing replicas under load (HLD, "the broker
+// hop must be real"). An in-process broker cannot be killed mid-write, so its
+// loss and duplication columns describe the harness rather than the system.
+//
+// The prefix is therefore load-bearing rather than cosmetic: Table refuses any
+// artefact carrying it. A smoke run that quietly rendered as a finding would be
+// the most damaging possible failure of this project, because the numbers would
+// look entirely reasonable.
+const BrokerFake = "fake:"
+
+// ErrNotAMeasurement is returned when artefacts came from an in-process broker.
+type ErrNotAMeasurement struct {
+	RunID  string
+	Broker string
+}
+
+func (e *ErrNotAMeasurement) Error() string {
+	return fmt.Sprintf(
+		"ablation: run %s used broker %q, which is in-process; it verifies the "+
+			"harness but cannot measure delivery semantics under broker loss. "+
+			"Run against a real cluster (make up-chaos && make ablate).",
+		e.RunID, e.Broker)
+}
+
+// IsMeasurement reports whether an artefact came from a real broker.
+func (a Artefact) IsMeasurement() bool {
+	return !strings.HasPrefix(a.BrokerVersion, BrokerFake)
+}
+
 // Row is one line of the Finding 2 table: the median of >= 3 runs, with the
 // min-max range, per the findings-report skill.
 type Row struct {
@@ -142,6 +178,14 @@ const MinRuns = 3
 func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 	if len(artefacts) == 0 {
 		return nil, &ErrMismatchedParameters{Detail: "no artefacts found"}
+	}
+	// Checked before the fixed-parameter guard: a set of smoke runs is
+	// perfectly self-consistent, so the parameter check would pass it happily
+	// and the table would render numbers that mean nothing.
+	for _, a := range artefacts {
+		if !a.IsMeasurement() {
+			return nil, &ErrNotAMeasurement{RunID: a.RunID, Broker: a.BrokerVersion}
+		}
 	}
 	key := artefacts[0].fixedKey()
 	for _, a := range artefacts[1:] {

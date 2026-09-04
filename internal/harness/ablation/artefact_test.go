@@ -2,6 +2,7 @@ package ablation
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -167,5 +168,56 @@ func TestWriteAndLoadRoundTrip(t *testing.T) {
 	}
 	if _, err := Load(filepath.Join(root, "nope")); err == nil {
 		t.Fatal("loading a missing directory should fail")
+	}
+}
+
+func TestTableRefusesFakeBrokerArtefacts(t *testing.T) {
+	// Deliberately self-consistent: every fixed parameter agrees, so the
+	// mismatch guard would pass these. Only the broker marks them as a smoke
+	// run, and that must be enough to stop them.
+	var arts []Artefact
+	for _, mode := range []consumer.Mode{consumer.AtMostOnce, consumer.AtLeastOnce, consumer.InboxDedup} {
+		for i := 0; i < MinRuns; i++ {
+			arts = append(arts, Artefact{
+				RunID: fmt.Sprintf("smoke-%s-%d", mode, i), Config: mode,
+				Seed: 7, Profile: "steady", RatePerSec: 100, DurationSec: 10,
+				LedgerSHA: "abc", BrokerVersion: BrokerFake + "kfake",
+				Sent: 1000, Applied: 1000, InvariantHeld: true,
+			})
+		}
+	}
+	_, err := Table(arts, MinRuns)
+	if err == nil {
+		t.Fatal("Table rendered a finding from in-process-broker runs")
+	}
+	var notMeasurement *ErrNotAMeasurement
+	if !errors.As(err, &notMeasurement) {
+		t.Fatalf("err = %v, want ErrNotAMeasurement", err)
+	}
+	if !strings.Contains(err.Error(), "make up-chaos") {
+		t.Fatalf("error does not say how to get a real measurement: %v", err)
+	}
+}
+
+func TestTableAcceptsRealBrokerArtefacts(t *testing.T) {
+	// The mirror image, so the guard above is not passing for some unrelated
+	// reason: identical artefacts with a real broker version must render.
+	var arts []Artefact
+	for _, mode := range []consumer.Mode{consumer.AtMostOnce, consumer.AtLeastOnce, consumer.InboxDedup} {
+		for i := 0; i < MinRuns; i++ {
+			arts = append(arts, Artefact{
+				RunID: fmt.Sprintf("real-%s-%d", mode, i), Config: mode,
+				Seed: 7, Profile: "steady", RatePerSec: 100, DurationSec: 10,
+				LedgerSHA: "abc", BrokerVersion: "redpanda v24.3.6",
+				Sent: 1000, Applied: 1000, InvariantHeld: true,
+			})
+		}
+	}
+	rows, err := Table(arts, MinRuns)
+	if err != nil {
+		t.Fatalf("Table refused real runs: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("got %d rows, want 3", len(rows))
 	}
 }
