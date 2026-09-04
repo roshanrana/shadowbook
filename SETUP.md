@@ -7,14 +7,23 @@ Do these in order. Thirty minutes, most of it downloads.
     # Go 1.23+  (https://go.dev/dl)          go version
     # Docker + compose v2                     docker compose version
     # uv (Python 3.12+ manager)               curl -LsSf https://astral.sh/uv/install.sh | sh
-    # buf (protobuf)                          https://buf.build/docs/installation
+    # protoc + protoc-gen-go  (make proto / gen-check use these directly)
+    #   protoc:        https://github.com/protocolbuffers/protobuf/releases
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+    # buf (OPTIONAL -- only for `buf lint` and `buf breaking` in CI)
+    #                                         https://buf.build/docs/installation
     # vegeta (load) — settled at Phase 0, D-005   go install github.com/tsenart/vegeta/v12@latest
     # golangci-lint, govulncheck
     go install golang.org/x/vuln/cmd/govulncheck@latest
     # Claude Code
     npm install -g @anthropic-ai/claude-code
 
-Sanity: `docker compose --profile chaos up -d` should bring up three Redpanda nodes, two Postgres, Prometheus. If the box struggles, note it — it feeds open question 3 in `STATE.md`. `make down` afterwards.
+Sanity: **`make doctor`** reports what this machine can run and exactly what is
+missing for the rest, in three tiers — `make demo` (Python only), `make check`
+(the full gate), `make ablate` (Finding 2, needs Docker). Run it first; it will
+tell you whether the next two steps are even necessary.
+
+Then `docker compose --profile chaos up -d` should bring up three Redpanda nodes, two Postgres, Prometheus. If the box struggles, note it. `make down` afterwards.
 
 ## 2. Repository
 

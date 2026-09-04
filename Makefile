@@ -87,6 +87,9 @@ perf: ## NFR-1/NFR-2 smoke. Its own gate: a latency assertion inside `check` is 
 security: ## Pre-public sweep: secrets, digest pins, dependency audits (T-052)
 	@bash scripts/security-sweep.sh
 
+doctor: ## What this machine can run, and exactly what to install for the rest
+	@bash scripts/doctor.sh
+
 preflight: ## Report whether an ablation could run here, and why not if not.
 	@$(GO) run ./cmd/harness preflight
 
@@ -115,5 +118,5 @@ gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
 	@if command -v protoc >/dev/null; then bash scripts/check-gen-diff.sh; \
 	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
 
-.PHONY: help check coverage perf security fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
+.PHONY: help doctor check coverage perf security fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
         coverage demo up up-chaos down ablate report proto
