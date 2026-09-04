@@ -71,6 +71,11 @@ services:
   redpanda-1: &rp1
     <<: *redpanda-common
     profiles: ["chaos"]
+    # Explicit, because the chaos schedule kills brokers BY NAME. Compose
+    # would otherwise generate <project>-redpanda-1-1, `docker kill redpanda-1`
+    # would fail, and a failed kill is recorded rather than fatal -- so the
+    # ablation would run with no chaos at all and report three identical rows.
+    container_name: redpanda-1
     command:
       - redpanda
       - start
@@ -94,6 +99,11 @@ services:
   redpanda-2:
     <<: *redpanda-common
     profiles: ["chaos"]
+    # Explicit, because the chaos schedule kills brokers BY NAME. Compose
+    # would otherwise generate <project>-redpanda-2-1, `docker kill redpanda-2`
+    # would fail, and a failed kill is recorded rather than fatal -- so the
+    # ablation would run with no chaos at all and report three identical rows.
+    container_name: redpanda-2
     command:
       - redpanda
       - start
@@ -119,6 +129,11 @@ services:
   redpanda-3:
     <<: *redpanda-common
     profiles: ["chaos"]
+    # Explicit, because the chaos schedule kills brokers BY NAME. Compose
+    # would otherwise generate <project>-redpanda-3-1, `docker kill redpanda-3`
+    # would fail, and a failed kill is recorded rather than fatal -- so the
+    # ablation would run with no chaos at all and report three identical rows.
+    container_name: redpanda-3
     command:
       - redpanda
       - start

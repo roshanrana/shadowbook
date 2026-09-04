@@ -121,6 +121,11 @@ func (s *SimCluster) mapBrokers() error {
 }
 
 func (s *SimCluster) Seeds() []string { return s.cluster.ListenAddrs() }
+
+// Replicas is 1: kfake keeps one cluster-wide log and does not replicate, so
+// asking for more would be a number with nothing behind it.
+func (s *SimCluster) Replicas() int16 { return 1 }
+
 func (s *SimCluster) Version() string { return s.ver }
 
 // Docker returns this cluster as its own control surface: a "container" here is

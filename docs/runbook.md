@@ -112,3 +112,50 @@ go mod tidy                     # regenerate go.sum with GOSUMDB on (D-016)
 The last one is not optional: `go.sum` was generated with the checksum database
 disabled in a restricted environment, and must be regenerated somewhere it is
 reachable.
+
+## Finding 2 against a real Redpanda cluster
+
+`make ablate-sim` needs nothing but Go and PostgreSQL, and produces a result
+labelled *simulated*. Producing the real Finding 2 needs a machine that can pull
+container images. Only two things are required there: **Docker** and **Go** —
+not `make`, not `uv`, so the commands below work in PowerShell as written.
+
+```
+cd <repo>
+
+# 1. Fetch dependencies and generate go.sum. Also discharges D-016.
+go mod tidy
+
+# 2. Three brokers with replication factor 3, plus both PostgreSQL instances.
+docker compose --profile chaos up -d
+docker ps --format "{{.Names}}"      # expect redpanda-1, redpanda-2, redpanda-3
+
+# 3. Build the ledger. The runner starts it as a separate process per run.
+go build -o bin/ledger ./cmd/ledger          # bin/ledger.exe on Windows
+
+# 4. The sweep: 3 configurations x 3 runs, ~4 minutes of load each.
+go run ./cmd/harness ablate --runs 3 --out reports/runs/redpanda ^
+  --dsn "postgres://shadowbook:shadowbook@localhost:5433/ledger?sslmode=disable" ^
+  --ledger bin/ledger --broker-version "redpanda v24.3.6"
+
+# 5. Fold the artefacts into the report's input.
+go run ./cmd/harness fold --in reports/runs/redpanda --out reports/runs/redpanda/finding2.json
+```
+
+Notes that have already cost time once each:
+
+- **Write to a NEW directory.** A table may not mix simulated and real runs, and
+  `reports/runs/demo` already holds simulated ones. The runner now refuses this
+  up front rather than after the sweep.
+- **Container names are pinned in compose.** The chaos schedule kills brokers by
+  name (`redpanda-1`), and Compose would otherwise generate
+  `<project>-redpanda-1-1`. A failed kill is recorded rather than fatal, so
+  without the pin the sweep runs with no chaos at all and reports three
+  identical rows.
+- **Topics are created with replication factor 3** on a real cluster, from
+  `Cluster.Replicas()`. The chaos profile sets `minimum_topic_replications=3`;
+  an RF=1 topic makes a broker kill destroy partitions instead of failing over,
+  which reads as a dramatic result rather than a misconfiguration.
+- The run is done when `fold` writes `finding2.json`. `make report` then renders
+  it, and the "simulated cluster" banner disappears on its own because the
+  artefacts' broker version no longer carries the `sim:` prefix.

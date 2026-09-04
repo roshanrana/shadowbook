@@ -31,6 +31,15 @@ import (
 type Cluster interface {
 	Seeds() []string
 	Version() string
+	// Replicas is the replication factor to create the run's topic with.
+	//
+	// Not a constant, and getting it wrong is silent: the chaos profile sets
+	// minimum_topic_replications=3, so a topic created with RF=1 is either
+	// rejected outright or -- worse, on a permissive cluster -- accepted, and
+	// then killing a broker destroys its partitions instead of failing over.
+	// The run would report total loss for every configuration and look like a
+	// dramatic result rather than a misconfigured one.
+	Replicas() int16
 	// Docker is the container control surface for the chaos schedule, or nil
 	// when this cluster cannot be killed. A nil Docker is not an error; it
 	// means the run is a harness check rather than a measurement, which
@@ -44,12 +53,23 @@ type Cluster interface {
 // runs against different broker builds are not comparable, and the
 // fixed-parameter guard is what enforces that.
 type RealCluster struct {
-	Addrs   []string
-	Ver     string
-	Control chaos.Docker
+	Addrs             []string
+	Ver               string
+	Control           chaos.Docker
+	ReplicationFactor int16
 }
 
-func (c RealCluster) Seeds() []string      { return c.Addrs }
+func (c RealCluster) Seeds() []string { return c.Addrs }
+
+// Replicas defaults to 3 to match the three-broker chaos profile, whose
+// quorum-preserving kills only mean anything with a replicated topic.
+func (c RealCluster) Replicas() int16 {
+	if c.ReplicationFactor > 0 {
+		return c.ReplicationFactor
+	}
+	return 3
+}
+
 func (c RealCluster) Version() string      { return c.Ver }
 func (c RealCluster) Docker() chaos.Docker { return c.Control }
 
@@ -164,6 +184,26 @@ func (r *Runner) Run(ctx context.Context) ([]Artefact, error) {
 		return nil, errors.New("ablation: no cluster")
 	}
 
+	// Refuse up front if the output directory already holds artefacts of a
+	// different kind.
+	//
+	// Fold would catch it later -- a table may not mix simulated and real runs
+	// -- but "later" means after a full sweep, which is tens of minutes against
+	// a real cluster. The likely case is someone who ran `make ablate-sim`
+	// first and then the real thing into the same directory, and finding out at
+	// the end costs them the whole run.
+	if existing, err := Load(r.Spec.OutDir); err == nil && len(existing) > 0 {
+		mine := Artefact{BrokerVersion: r.Cluster.Version()}.Kind()
+		for _, a := range existing {
+			if a.Kind() != mine {
+				return nil, fmt.Errorf(
+					"ablation: %s already holds %s runs (e.g. %s) and this sweep is %s; "+
+						"they cannot share a table. Move or delete them first",
+					r.Spec.OutDir, a.Kind(), a.RunID, mine)
+			}
+		}
+	}
+
 	var out []Artefact
 	for _, mode := range r.Spec.Configs {
 		for i := 0; i < r.Spec.Runs; i++ {
@@ -235,7 +275,7 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID string) (Art
 	// Created before the ledger starts: a consumer subscribing to a topic that
 	// does not exist yet spends its first seconds retrying metadata, which eats
 	// into the measured window.
-	if err := broker.EnsureTopic(ctx, r.Cluster.Seeds(), topic, 6, 1); err != nil {
+	if err := broker.EnsureTopic(ctx, r.Cluster.Seeds(), topic, 6, r.Cluster.Replicas()); err != nil {
 		return art, err
 	}
 
