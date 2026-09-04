@@ -3,8 +3,21 @@
 // Producer and Consumer are interfaces so the outbox relay and the movement
 // consumer can be tested exhaustively without a broker -- including the
 // failure modes Finding 2 is about, which are far easier to provoke in a fake
-// than by killing a container. The franz-go implementations live alongside and
-// are exercised against real Redpanda in the ablation runs.
+// than by killing a container.
+//
+// Two implementations satisfy them:
+//
+//   - Fake, below: in-process, deterministic, able to lie on demand. Used by
+//     every unit and integration test, and by `cmd/ledger` when no seed
+//     brokers are configured.
+//   - KafkaProducer / KafkaConsumer in kafka.go: franz-go against a real
+//     cluster, used whenever seed brokers ARE configured.
+//
+// The Kafka clients are verified against kfake, which speaks the real Kafka
+// wire protocol over real sockets, so the protocol handling is tested rather
+// than assumed. That is NOT the same as verifying Finding 2: the finding
+// measures a real multi-broker cluster losing replicas under load, and no
+// in-process broker can stand in for that.
 package broker
 
 import (

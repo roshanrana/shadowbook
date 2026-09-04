@@ -45,6 +45,8 @@ func run() error {
 		mode       = flag.String("mode", envOr("SHADOWBOOK_CONSUMER_MODE", "C"), "consumer delivery mode A|B|C|D")
 		principals = flag.String("principals", envOr("SHADOWBOOK_PRINCIPALS", "sim,eod,consumer"), "comma-separated allow-list")
 		invEvery   = flag.Duration("invariant-interval", 500*time.Millisecond, "invariant check interval")
+		brokers    = flag.String("brokers", envOr("SHADOWBOOK_BROKERS", ""), "comma-separated Kafka seed brokers; empty means the in-process fake")
+		group      = flag.String("group", envOr("SHADOWBOOK_GROUP", ""), "consumer group id; defaults to shadowbook-<mode>")
 	)
 	flag.Parse()
 
@@ -94,14 +96,20 @@ func run() error {
 	// consumer are always running: their behaviour is what Finding 2 measures,
 	// and a ledger that only wires them up under a flag would be a different
 	// program from the one under test.
-	bus := broker.NewFake()
-	relay := outbox.New(st, bus, outbox.Options{Topic: "shadowbook.postings.v1"})
-	movements, err := consumer.New(st, bus, consumer.Options{
-		Mode: consumer.Mode(*mode), Topic: "shadowbook.movements.v1", Metrics: metrics,
+	prod, cons, kind, err := dialBroker(*brokers, *group, *mode)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = prod.Close(); _ = cons.Close() }()
+
+	relay := outbox.New(st, prod, outbox.Options{Topic: postingsTopic})
+	movements, err := consumer.New(st, cons, consumer.Options{
+		Mode: consumer.Mode(*mode), Topic: movementsTopic, Metrics: metrics,
 	})
 	if err != nil {
 		return err
 	}
+	logger.Info("broker configured", "kind", kind, "mode", *mode)
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return checker.Run(gctx) })
@@ -128,6 +136,56 @@ func run() error {
 	}
 	logger.Info("stopped cleanly")
 	return nil
+}
+
+// The two topics of LLD §4.2. They are deliberately NOT the same topic: the
+// relay publishes this ledger's own postings for observability, while the
+// consumer reads movements produced by legacy-sim. The in-process fake polls
+// every topic it holds, so a single-topic confusion would not show up there --
+// only against a real broker, where a subscription is to a named topic.
+const (
+	postingsTopic  = "shadowbook.postings.v1"
+	movementsTopic = "shadowbook.movements.v1"
+)
+
+// dialBroker returns the producer and consumer for this process.
+//
+// With no seed brokers the in-process fake is used, which is what every test
+// and the Finding 1 demo want: one process, no infrastructure. With seed
+// brokers the franz-go clients are used. The relay and the consumer are wired
+// identically either way -- the only difference is what they are talking to,
+// which is the point.
+func dialBroker(seeds, group, mode string) (broker.Producer, broker.Consumer, string, error) {
+	if strings.TrimSpace(seeds) == "" {
+		bus := broker.NewFake()
+		return bus, bus, "in-process fake", nil
+	}
+	addrs := strings.Split(seeds, ",")
+	for i := range addrs {
+		addrs[i] = strings.TrimSpace(addrs[i])
+	}
+	if group == "" {
+		// Distinct per configuration: two modes sharing a group id would share
+		// committed offsets, and each would appear to lose the records the
+		// other consumed.
+		group = "shadowbook-" + mode
+	}
+
+	prod, err := broker.NewKafkaProducer(broker.KafkaConfig{
+		Seeds: addrs, ClientID: "shadowbook-relay-" + mode,
+	})
+	if err != nil {
+		return nil, nil, "", err
+	}
+	cons, err := broker.NewKafkaConsumer(broker.KafkaConfig{
+		Seeds: addrs, Group: group, Topics: []string{movementsTopic},
+		ClientID: "shadowbook-consumer-" + mode,
+	})
+	if err != nil {
+		_ = prod.Close()
+		return nil, nil, "", err
+	}
+	return prod, cons, fmt.Sprintf("kafka %v group=%s", addrs, group), nil
 }
 
 func envOr(key, fallback string) string {

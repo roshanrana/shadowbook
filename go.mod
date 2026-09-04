@@ -11,6 +11,10 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1
 	github.com/tsenart/vegeta/v12 v12.12.0
+	github.com/twmb/franz-go v1.19.5
+	github.com/twmb/franz-go/pkg/kadm v1.15.0
+	github.com/twmb/franz-go/pkg/kfake v0.0.0-20250603004440-37eecbb8927f
+	github.com/twmb/franz-go/pkg/kmsg v1.11.2
 	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/sync v0.10.0
