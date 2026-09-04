@@ -103,10 +103,17 @@ doctor: ## What this machine can run, and exactly what to install for the rest
 preflight: ## Report whether an ablation could run here, and why not if not.
 	@$(GO) run ./cmd/harness preflight
 
+# Finding 1 and Finding 2 need not come from the same directory. Finding 1 is
+# produced by `make demo` and Finding 2 by an ablation that may have run on a
+# different machine entirely -- and a table may not mix simulated and real runs,
+# so the real sweep writes to its own directory. Overridable:
+#   make report FINDING2=reports/runs/redpanda/finding2.json
+FINDING2 ?= $(RUN_DIR)/finding2.json
+
 report: ## Render reports/FINDINGS.md from run artefacts. Deterministic.
 	@$(UV) run python -m report.render \
 		--finding1 $(RUN_DIR)/finding1.json \
-		--finding2 $(RUN_DIR)/finding2.json \
+		--finding2 $(FINDING2) \
 		--repo . --out reports/FINDINGS.md
 
 proto: ## Regenerate Go and Python from contracts/. Output is committed.

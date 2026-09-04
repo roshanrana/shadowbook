@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Git SHA | `5bb8ff5f085d28e881d8086f168ac57ebaaad115` |
+| Git SHA | `376b7cf3ef300fdc0dae0431a212bc209fb6b7f6` |
 | Seed | `20260903` |
 | Windows | W1, W2 |
 | Broker | sim:kfake-3-broker |
@@ -221,7 +221,7 @@ change what the ledger says; they never made it disagree with itself.
 ## Reproduce
 
 ```
-git checkout 5bb8ff5f085d28e881d8086f168ac57ebaaad115
+git checkout 376b7cf3ef300fdc0dae0431a212bc209fb6b7f6
 cp .env.example .env
 make up
 make demo          # both windows, Finding 1
