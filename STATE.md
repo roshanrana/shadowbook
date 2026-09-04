@@ -5,11 +5,15 @@
 ## Phase
 
 **Phases 0-3: COMPLETE.** Requirements, HLD, LLD and the execution plan were all
-approved by the owner on 2026-09-03. Decisions D-001 … D-019 in
+approved by the owner on 2026-09-03. Decisions D-001 … D-033 in
 `docs/design/decisions.md`.
 
-**Phases 4-7: IMPLEMENTED.** Guardrails, M0-M5 and M7 are done; M6's numbers and
-M6b are not. `docs/ship-report.md` is the go/no-go and is the honest account.
+**Phases 4-7: COMPLETE.** Both findings are measured. Finding 2 ran against a
+real three-broker Redpanda v24.3.6 cluster on 2026-09-04 (sweep `s1788529596`).
+`docs/ship-report.md` is the go/no-go and remains the honest account: two things
+are short of the mark and are named there rather than hidden — configuration D
+is implemented but has never run, and NFR-1's throughput was not met on the
+available hardware.
 
 | Milestone | State |
 |---|---|
@@ -20,8 +24,8 @@ M6b are not. `docs/ship-report.md` is the go/no-go and is the honest account.
 | M3 reconcile | done — three grains, classification, ageing, **Finding 1: 12 of 12 detected** |
 | M4 demo | done — `make demo` in ~2s, README, runbook, generated `FINDINGS.md` |
 | M5 harness | done — vegeta profiles, chaos scheduler, ablation artefacts, all tested |
-| M6 Finding 2 | **partial** — mechanism demonstrated by the consumer tests; numbers need Docker. `cmd/harness ablate` orchestration not implemented (T-048) |
-| M6b configuration D | not started — deferred by D-008 |
+| M6 Finding 2 | **done** — measured against real Redpanda: A lost 25 movements and duplicated up to 8,472; B duplicated up to 8,950 and lost nothing; C did neither. Invariant held in all nine runs |
+| M6b configuration D | **implemented, never run** — `kfake` has no transactional producer ids, so only a real cluster can verify it (D-032) |
 | M7 hardening | done — coverage gate, security sweep, perf smoke, ship report |
 
 ## Phase 0 questions — ANSWERED (owner, 2026-09-03)
@@ -42,22 +46,22 @@ M6b are not. `docs/ship-report.md` is the go/no-go and is the honest account.
 
 ## Now / next
 
-- **Now:** owner go/no-go on `docs/ship-report.md`.
-- **Next, in order of value:**
-  1. **Make the repo public-ready** (2 items, both need normal network access):
-     `scripts/pin-digests.sh` for D-017, and `go mod tidy` with `GOSUMDB` on for
-     D-016. `make security` fails on exactly these two until they are done.
-  2. **Implement the ablation orchestration** (T-048): start the ledger per
-     configuration, drive load through it, collect measurements. Everything it
-     needs — artefact schema, fixed-parameter guard, chaos scheduler, all four
-     consumer modes — is written and tested.
-  3. **Run `make ablate` on the Ryzen box** to populate Finding 2, then
-     `make report`.
+- **Now:** owner go/no-go on `docs/ship-report.md`. Both findings are measured
+  and the repository is coherent; what remains is optional.
+- **Next, in order of value — all optional, none blocking:**
+  1. **`scripts/pin-digests.sh`** (D-017) on a machine with registry access.
+     The single remaining `make security` failure, and the one thing that
+     should be done before the repo is public.
+  2. **Run configuration D** (M6b, D-032): add `--configs A,B,C,D` to the
+     ablate command against the real cluster. It is the only unexercised code
+     in the tree, and one sweep both verifies it and completes the table.
+  3. **Re-run the sweep to populate latency for C** — the measurement landed
+     after the 2026-09-04 sweep, so the committed table shows loss and
+     duplication but no timings. Combines with (2) into one run.
   4. **Measure NFR-1 on real hardware**: `SHADOWBOOK_PERF_RATE=2000 make perf`.
      Not met in the build environment (~1,584/s saturated).
-  5. Configuration D (M6b), if the interview timing allows.
-- **Before an interview:** `git tag round-2`. Finding 1 alone is a complete
-  result, and the ship report says exactly what is and is not measured.
+- **Before an interview:** `git tag round-2`. Both findings stand on their own,
+  and the ship report says exactly what is and is not measured.
 
 ## Milestones (provisional — finalised in Phase 3)
 
@@ -105,7 +109,7 @@ _(none — B-001 resolved 2026-09-03: the full `enterprise-dev-lifecycle` skill 
 
 | # | Deviation | Why | Reverting |
 |---|---|---|---|
-| D-016 | `go.mod` clean; a **gitignored `go.work`** supplies GitHub mirrors for vanity import paths | The implementation environment's egress allowlist reaches github.com but no Go module proxy | Delete `go.work` on a networked machine. **Then run `go mod tidy` to regenerate `go.sum` with the checksum database on** — it was disabled during implementation |
+| D-016 | `go.mod` clean; a **gitignored `go.work`** supplies GitHub mirrors for vanity import paths | The implementation environment's egress allowlist reaches github.com but no Go module proxy | `scripts/dev-workspace.sh` regenerates it; delete `go.work` on a networked machine. **`go.sum` obligation DISCHARGED 2026-09-04 (D-027)** — `go mod tidy` ran with the checksum database on, which also raised the Go floor to 1.23.8 |
 | D-017 | Compose images pinned by immutable tag, not digest | No container registry reachable | `scripts/pin-digests.sh`, one pass. **Required before the repo goes public** |
 | D-018 | ~60-line embedded migrator instead of goose (supersedes part of D-013) | goose unresolvable in the environment; also one fewer dependency for a Postgres-only, forward-only need | Contained to `migrations/migrate.go` |
 | D-019 | pgx v5.7.5, not the approved v5.10.0 | **Defect in the approved LLD**: v5.10.0 declares `go 1.25.0`, the project floor is Go 1.23+. They are incompatible | Either keep v5.7.5, or raise the Go floor to 1.25 and restore v5.10.0 |

@@ -3,9 +3,14 @@
 Evidence of readiness, and an honest account of what is not ready. Produced at
 the Phase 7 gate; the go/no-go is the owner's.
 
-**Recommendation: ship as a portfolio artefact. Do not describe Finding 2 as
-measured.** Finding 1 is complete and reproducible. Finding 2's mechanism is
-demonstrated and its numbers are not.
+**Recommendation: ship as a portfolio artefact. Both findings are measured.**
+Finding 1 is complete and reproducible from a seed. Finding 2 was measured on
+2026-09-04 against a real three-broker Redpanda v24.3.6 cluster at replication
+factor 3, under the quorum-preserving chaos schedule (sweep `s1788529596`).
+
+Two things are still short of the mark and are stated as such: configuration D
+is implemented but has never run, and NFR-1's throughput target was not met on
+the machine available. Neither is hidden by a passing check.
 
 ## 1. What runs
 
@@ -13,12 +18,13 @@ demonstrated and its numbers are not.
 |---|---|---|
 | `make check` | green, 30s | format, lint, `mypy --strict`, `go vet`, unit, integration, `-race`, plus the generated-code and calendar-golden gates |
 | `make demo` | green, ~2s | 12 of 12 quirks detected across both windows; regenerates `reports/FINDINGS.md` |
-| `make coverage` | green | ledger 89.9% (target 85%), posting path 96.3% (target 95%), reconcile 97%, legacy-sim ≥85% |
+| `make coverage` | green | ledger 85.9% (target 85%), posting path 96.3% (target 95%), reconcile 97%, legacy-sim ≥85% |
 | `make perf` | green at the smoke rate | p50 2.3ms, p95 3.1ms, p99 3.7ms at 200 postings/s |
-| `make report` | green | deterministic; renders Finding 2 as **not run** rather than implying numbers |
+| `make report` | green | deterministic (asserted byte-for-byte); renders both findings, and refuses artefacts that are simulated, undrained, or from a different sweep |
 | `go run ./cmd/ledger` | green | migrations apply at start-up, `/readyz` reports the live invariant, `/metrics` serves |
-| `make ablate` | **refuses to run** | no Docker daemon here; see §4 |
-| `make security` | **fails on two checks** | both are recorded deviations; see §5 |
+| `make ablate` | green against a real cluster | 9 runs, 36,000 movements each, all drained; four chaos events executed per run |
+| `make ablate-sim` | green with no Docker | same sweep against an in-process multi-broker cluster; results labelled `simulated` and refused as Finding 2 (D-023, D-024) |
+| `make security` | **fails on one check** | compose digest pins; see §5 |
 
 ## 2. Findings
 
@@ -28,13 +34,27 @@ way "business days until this surfaced" means what it says. A combined run with
 all twelve enabled is reported alongside and detects **eleven** — quirks
 compound, and that gap is itself a result.
 
-**Finding 2 — mechanism demonstrated, numbers not measured.** The consumer test
-suite shows deterministically that mode B duplicates under redelivery (4 entries
-for 2 movements), C and D suppress it via `inbox_pkey` (2 entries), and A loses
-a batch outright because it commits offsets before applying. All four preserve
-the global invariant, which is the point: duplication is a correctness failure
-the zero-sum rule cannot catch. Loss, duplication and latency **numbers** under
-real broker chaos require the three-broker profile and have not been produced.
+**Finding 2 — measured (A, B, C).** Three brokers at RF=3, brokers killed and
+restarted on schedule, 36,000 movements per run, three runs per configuration,
+every run drained.
+
+| Config | Applied | Lost | Duplicated | Invariant |
+|---|---|---|---|---|
+| A | 36000 [35975–36000] | **0 [0–25]** | 0 [0–8472] | held |
+| B | 36000 | 0 | 4959 [0–8950] | held |
+| C | 36000 | 0 | **0** | held |
+
+**A is the row worth reading twice: it both lost and duplicated.** It is the
+only configuration that lost anything — 25 movements produced, acknowledged by
+the cluster, never applied — which is at-most-once doing exactly what it
+promises. It also duplicated, because the promise holds only while the offset
+commit survives and a coordinator failover can lose it. C duplicated nothing in
+any run, suppressed by `inbox_pkey`: a database constraint, not a race that
+usually goes the right way. **The zero-sum invariant held in all nine runs** —
+duplication is a correctness failure the invariant cannot catch, which is
+precisely why it needed measuring.
+
+Configuration D is implemented and has never run: see §4.
 
 ## 3. Requirements not met
 
@@ -42,8 +62,9 @@ real broker chaos require the three-broker profile and have not been produced.
 |---|---|---|---|
 | NFR-1 | ≥ 2,000 postings/s | ~1,584/s saturated in this environment | **Not verified.** Unmeasured on the target machine. Every request succeeded and the invariant held throughout, so this is capacity, not correctness |
 | NFR-2 | p99 ≤ 50ms | 3.7ms at 200/s; 164ms at 1,000/s; 255ms at 2,000/s offered | **Met at low rate, not at the NFR-1 rate.** The two NFRs have not been met simultaneously |
-| FR-H2, FR-H3 | chaos runs, ablation A–C | not executed | Needs Docker |
-| M6b | configuration D against Redpanda | not executed | Deferred by D-008 |
+| NFR-1a | ≥ 1,000 movements/s during chaos | run at 200/s | **Not met, and the reason is measured.** The consumer applies ~280 movements/s on a Docker Desktop / WSL2 host, so 1,000/s builds a backlog it cannot clear. The ablation compares configurations against each other under identical chaos, so a lower shared rate is a valid experiment — running above what the consumer sustains and reporting the backlog as loss would not be (D-030) |
+| FR-H2, FR-H3 | chaos runs, ablation A–C | **executed** | 9 runs against real Redpanda; four chaos events per run, executed on schedule with no errors |
+| M6b | configuration D against Redpanda | implemented, **never run** | D-032. `kfake` cannot verify it (no transactional producer ids), so only a real cluster can |
 
 The posting path does roughly five statements per posting — idempotency claim,
 posting, two entries, outbox, idempotency completion — and the zero-sum
@@ -55,37 +76,44 @@ machine would be tuning to noise.
 
 Named plainly, because "implemented" and "exercised" are different claims.
 
-| Component | Written and tested | Never run against the real thing |
-|---|---|---|
-| `internal/broker` | in-process fake, exhaustively | franz-go against Redpanda |
-| `internal/ledger/consumer` | all four modes, incl. redelivery and loss | real broker, real rebalance, real offsets |
-| `internal/ledger/outbox` | relay, failure mid-batch, drain on shutdown | real produce with `acks=all` |
-| `internal/harness/chaos` | scheduler, validation, failure handling | real `docker kill` |
-| `internal/harness/ablation` | artefact schema, fixed-parameter guard, table folding | a real run |
-| `cmd/harness ablate` | preflight, orchestration, artefacts, fold (T-048/T-049) | **measured against real Redpanda v24.3.6**, 3 brokers RF=3, sweep s1788529596. Configuration D (M6b) not run |
+Most of this table has now been discharged. What remains is one row, and it is
+named rather than buried:
 
-`cmd/harness ablate` fails with a message saying exactly this rather than
-producing numbers measured against something that was not the experiment.
+| Component | State |
+|---|---|
+| `broker.KafkaTransactionalConsumer` (configuration D) | **Implemented, never run.** `kfake` returns `UNKNOWN_SERVER_ERROR` for any transactional producer id — its `handleInitProducerID` carries a literal `// TODO: Transactional IDs` — so nothing local can exercise it. The test skips with that reason rather than passing against a path the broker never took (D-032) |
+
+Everything else in the previous version of this table — franz-go against a real
+broker, real rebalances, real offset commits, real `docker kill`, a real
+ablation run — was exercised in the 2026-09-04 sweep.
+
+**What that sweep cost is itself part of the evidence.** Nine defects surfaced
+the first time the system met a real cluster, none of which any test could have
+reached: five in a chaos profile that had never once been started (container
+names the schedule could not match, advertised listeners unreachable from the
+host, four inert cluster properties and one fatal one, and credentials that
+broke the documented setup path), and four in the harness (fatal handling of
+retriable commit errors, a drain detector that counted a working consumer's
+backlog as loss, sweep-to-sweep contamination through reused topics, and a
+duplication count that was identically zero for the configurations without an
+inbox). Every one produced results that were internally consistent and wrong.
+Three would have shipped as findings had the arithmetic not been impossible.
 
 ## 5. Before the repository goes public
 
-`make security` currently fails on two checks. Both are recorded deviations, and
-both need a machine with normal network access:
-
 1. **Compose images are tag-pinned, not digest-pinned** (D-017). Run
-   `scripts/pin-digests.sh` and commit the result.
-2. **`go.sum` was never generated** (D-016). The build environment could not
-   reach a Go module proxy, so `go.work` supplied GitHub mirrors and the
-   checksum database was disabled. Delete `go.work`, run `go mod tidy` with
-   `GOSUMDB` on, and commit `go.sum`. **This is a real reduction in
-   supply-chain verification until it is done.**
+   `scripts/pin-digests.sh` on a machine with registry access and commit the
+   result. This is the one remaining `make security` failure.
+2. ~~`go.sum` was never generated~~ — **done** (D-027). `go mod tidy` ran with
+   the checksum database enabled on 2026-09-04. It raised the Go floor from
+   1.23 to 1.23.8, because franz-go's `kfake` and `kadm` declare it.
 
-Then install and run the three audits the sweep currently skips: `govulncheck`,
+Then install and run the three audits the sweep still skips: `govulncheck`,
 `pip-audit`, `gitleaks`.
 
 ## 6. Design decisions a reviewer should read first
 
-`docs/design/decisions.md`, D-001 … D-019. The four that most shape the result:
+`docs/design/decisions.md`, D-001 … D-033. The four that most shape the result:
 
 - **D-010** — two demo windows. A 30-business-day window cannot contain both an
   October holiday and a February leap day, and anchoring naively on the leap day
