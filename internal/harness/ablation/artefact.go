@@ -241,8 +241,10 @@ type Row struct {
 	// data instead of written alongside it. Prose that has to be kept in sync
 	// by hand goes stale the first time the experiment is re-run, and a report
 	// whose words contradict its own table is worse than one with no words.
-	DupMin int64 `json:"dup_min"`
-	DupMax int64 `json:"dup_max"`
+	DupMin  int64 `json:"dup_min"`
+	DupMax  int64 `json:"dup_max"`
+	LostMin int64 `json:"lost_min"`
+	LostMax int64 `json:"lost_max"`
 
 	// LatencyMeasured is false when the run recorded no per-record timings.
 	// The columns then render as "not measured" rather than as zero, which
@@ -317,6 +319,7 @@ func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 			}
 		}
 		dupMin, dupMax := runs[0].Duplicated, runs[0].Duplicated
+		lostMin, lostMax := runs[0].Lost, runs[0].Lost
 		latency := false
 		for _, r := range runs {
 			if r.Duplicated < dupMin {
@@ -324,6 +327,12 @@ func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 			}
 			if r.Duplicated > dupMax {
 				dupMax = r.Duplicated
+			}
+			if r.Lost < lostMin {
+				lostMin = r.Lost
+			}
+			if r.Lost > lostMax {
+				lostMax = r.Lost
 			}
 			if r.P50 > 0 || r.P95 > 0 || r.P99 > 0 {
 				latency = true
@@ -334,6 +343,8 @@ func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 			Runs:            len(runs),
 			DupMin:          dupMin,
 			DupMax:          dupMax,
+			LostMin:         lostMin,
+			LostMax:         lostMax,
 			LatencyMeasured: latency,
 			Sent:            stat(runs, func(a Artefact) int64 { return a.Sent }),
 			Applied:         stat(runs, func(a Artefact) int64 { return a.Applied }),

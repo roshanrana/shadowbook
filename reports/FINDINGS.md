@@ -5,10 +5,10 @@
 
 | | |
 |---|---|
-| Git SHA | `376b7cf3ef300fdc0dae0431a212bc209fb6b7f6` |
+| Git SHA | `a751d0c6b85ac6cf95e7251354242cbcbd92499f` |
 | Seed | `20260903` |
 | Windows | W1, W2 |
-| Broker | sim:kfake-3-broker |
+| Broker | redpanda v24.3.6 |
 | Go / Python | go1.24.7 / 3.13.13 |
 | PostgreSQL | PostgreSQL 16 |
 | Machine | Linux x86_64 |
@@ -114,17 +114,6 @@ reconciliation can do; reporting only the isolated number would overstate it.
 
 ## Finding 2 — Delivery-semantics ablation under broker loss
 
-> **Simulated cluster, not Redpanda.** These runs used `sim:kfake-3-broker`:
-> several brokers in one process, each on its own TCP socket, killed and
-> restarted on the chaos schedule, with the group coordinator moving on each
-> kill so consumers genuinely rebalance. The delivery-mode comparison below is
-> therefore real — the modes were exercised over the Kafka wire protocol,
-> through actual rebalances, under identical chaos.
->
-> What it is **not**: there is no replication, no ISR to shrink, no unclean
-> leader election and no disk. Absolute latency and throughput here describe one
-> process on one machine and should not be quoted. Treat the **ordering and the
-> presence or absence of duplicates** as the result, not the magnitudes.
 Median of 3 runs per configuration, min–max in brackets.
 Counts for configurations A and B are **net, not exact**. Neither keeps an
 inbox, and both mint a fresh posting id per delivery, so nothing in the ledger
@@ -135,9 +124,9 @@ inbox — without one, the ledger cannot answer "was this applied twice?" at all
 
 | Config | Runs | Sent | Applied | Lost | Duplicated | Latency p50/p95/p99 | Drain (s) | Invariant held |
 |---|---|---|---|---|---|---|---|---|
-| A | 3 | 12000 | 12000 | 0 | 4765 [0–9000] | not measured | 0.5 [0.5–0.5] | Y |
-| B | 3 | 12000 | 12000 | 0 | 7479 [0–8990] | not measured | 0.5 | Y |
-| C | 3 | 12000 | 12000 | 0 | 0 | not measured | 0.5 [0.5–0.5] | Y |
+| A | 3 | 36000 | 36000 [35975–36000] | 0 [0–25] | 0 [0–8472] | not measured | 0.5 [0.5–0.5] | Y |
+| B | 3 | 36000 | 36000 | 0 | 4959 [0–8950] | not measured | 0.5 [0.5–0.5] | Y |
+| C | 3 | 36000 | 36000 | 0 | 0 | not measured | 0.5 [0.5–0.5] | Y |
 End-to-end latency is **not measured** in this run. The harness records what was
 applied, not when, so per-record timings would have to be inferred from commit
 timestamps -- and an inferred number in a latency column is worse than an empty
@@ -147,11 +136,10 @@ one. It is left empty rather than filled with a zero that would read as
 **What the columns say.** Every statement here is derived from the table above
 rather than written beside it, so it cannot drift from the data on a re-run.
 
-- **A** duplicated in some runs and not others (0–9000),
-  so its safety depends on timing rather than on the configuration alone.
-- **B** duplicated in some runs and not others (0–8990),
-  so its safety depends on timing rather than on the configuration alone.
-- **C** duplicated nothing in any of its 3 runs.
+
+- **A** — duplicated in some runs and not others (0–8472), and **lost 25 movements** at worst — the only configuration here that lost anything at all.
+- **B** — duplicated in some runs and not others (0–8950), and lost nothing.
+- **C** — duplicated nothing in any of its 3 runs, and lost nothing.
 
 The mechanism behind those rows does not vary between runs. Configuration C
 cannot duplicate: a redelivered message collides on `inbox_pkey` and the whole
@@ -159,13 +147,18 @@ transaction rolls back, so suppression is a database constraint rather than a
 race that usually goes the right way. B has no such constraint, and every
 redelivery it sees becomes a second effect.
 
-A is the row worth reading twice. At-most-once is supposed to lose rather than
-duplicate, and it commits offsets *before* applying to guarantee that -- but
-that guarantee lasts only as long as the commit itself survives. When a
-coordinator failover loses the commit, the records come back and are applied
-again under fresh posting ids. "At-most-once" is therefore not a property of the
-configuration on its own; it holds while offset commits are durable, and a
-broker failure is precisely the event that makes them not durable.
+A is the row worth reading twice, because it did **both**. At-most-once commits
+offsets *before* applying, so a failure in that window loses the batch outright
+— and that is what the loss column records: movements that were produced,
+acknowledged by the cluster, and never applied to the ledger. Nothing else here
+lost anything.
+
+But A also duplicated. Its guarantee lasts only as long as the offset commit
+itself survives, and a coordinator failover can lose the commit; the records
+then come back and are applied again under fresh posting ids. So at-most-once
+is not a property of the configuration alone. It buys you "no duplicates" only
+while commits are durable, and pays for it with real loss when they are not —
+which is the worst of both outcomes, arrived at honestly.
 
 The zero-sum invariant held in every run of every configuration. Duplicates
 change what the ledger says; they never made it disagree with itself.
@@ -221,7 +214,7 @@ change what the ledger says; they never made it disagree with itself.
 ## Reproduce
 
 ```
-git checkout 376b7cf3ef300fdc0dae0431a212bc209fb6b7f6
+git checkout a751d0c6b85ac6cf95e7251354242cbcbd92499f
 cp .env.example .env
 make up
 make demo          # both windows, Finding 1

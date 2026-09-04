@@ -146,3 +146,26 @@ def test_report_states_the_attribution_gap(artefact: Path) -> None:
     assert "detection is not attribution" in out
     assert "Isolated to a single quirk" in out
     assert "tripwire, not a diagnosis" in out
+
+
+def test_finding2_notes_state_loss_and_duplication() -> None:
+    """The bullets must say what happened, including loss.
+
+    The first version of this section reported duplication only, and would have
+    stayed silent about the single most important column in the real-cluster
+    run: configuration A was the only one that lost records.
+    """
+    from report.render import _finding2_notes
+
+    rows = [
+        {"config": "A", "runs": 3, "dup_min": 0, "dup_max": 8472, "lost_max": 25},
+        {"config": "B", "runs": 3, "dup_min": 0, "dup_max": 8950, "lost_max": 0},
+        {"config": "C", "runs": 3, "dup_min": 0, "dup_max": 0, "lost_max": 0},
+    ]
+    notes = _finding2_notes(rows)
+    assert len(notes) == 3
+    assert "lost 25 movements" in notes[0]
+    assert "lost nothing" in notes[1]
+    assert "duplicated nothing in any of its 3 runs" in notes[2]
+    # Every note is a single markdown bullet on its own line.
+    assert all(n.startswith("- **") and "\n" not in n for n in notes)

@@ -142,6 +142,35 @@ def _cadence_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _finding2_notes(rows: list[dict[str, Any]]) -> list[str]:
+    """One sentence per configuration, derived from the table.
+
+    Built here rather than in the template because Jinja whitespace control
+    kept collapsing the bullets onto a single line, and because a sentence that
+    states a result deserves a test.
+    """
+    notes: list[str] = []
+    for r in rows:
+        dup_min, dup_max, runs = r.get("dup_min", 0), r.get("dup_max", 0), r.get("runs", 0)
+        if dup_max == 0:
+            dup = f"duplicated nothing in any of its {runs} runs"
+        elif dup_min > 0:
+            dup = f"duplicated in **every** run ({dup_min}\u2013{dup_max})"
+        else:
+            dup = f"duplicated in some runs and not others (0\u2013{dup_max})"
+
+        lost_max = r.get("lost_max", 0)
+        if lost_max == 0:
+            lost = "and lost nothing."
+        else:
+            lost = (
+                f"and **lost {lost_max} movements** at worst \u2014 the only "
+                "configuration here that lost anything at all."
+            )
+        notes.append(f"- **{r['config']}** \u2014 {dup}, {lost}")
+    return notes
+
+
 def build_context(
     finding1_path: Path, finding2_path: Path | None, repo: Path, generated_at: str
 ) -> dict[str, Any]:
@@ -209,6 +238,7 @@ def build_context(
         "finding2": finding2,
         "finding2_runs": finding2_runs,
         "finding2_reason": finding2_reason,
+        "finding2_notes": _finding2_notes(finding2) if finding2 else [],
         "finding2_kind": finding2_kind,
         "finding2_broker": finding2_broker,
         "finding2_exact": finding2_exact,

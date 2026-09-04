@@ -145,15 +145,8 @@ one. It is left empty rather than filled with a zero that would read as
 **What the columns say.** Every statement here is derived from the table above
 rather than written beside it, so it cannot drift from the data on a re-run.
 
-{% for r in finding2 -%}
-{% if r.dup_max == 0 -%}
-- **{{ r.config }}** duplicated nothing in any of its {{ r.runs }} runs.
-{% elif r.dup_min > 0 -%}
-- **{{ r.config }}** duplicated in **every** run ({{ r.dup_min }}–{{ r.dup_max }}).
-{% else -%}
-- **{{ r.config }}** duplicated in some runs and not others (0–{{ r.dup_max }}),
-  so its safety depends on timing rather than on the configuration alone.
-{% endif -%}
+
+{% for note in finding2_notes %}{{ note }}
 {% endfor %}
 
 The mechanism behind those rows does not vary between runs. Configuration C
@@ -162,13 +155,18 @@ transaction rolls back, so suppression is a database constraint rather than a
 race that usually goes the right way. B has no such constraint, and every
 redelivery it sees becomes a second effect.
 
-A is the row worth reading twice. At-most-once is supposed to lose rather than
-duplicate, and it commits offsets *before* applying to guarantee that -- but
-that guarantee lasts only as long as the commit itself survives. When a
-coordinator failover loses the commit, the records come back and are applied
-again under fresh posting ids. "At-most-once" is therefore not a property of the
-configuration on its own; it holds while offset commits are durable, and a
-broker failure is precisely the event that makes them not durable.
+A is the row worth reading twice, because it did **both**. At-most-once commits
+offsets *before* applying, so a failure in that window loses the batch outright
+— and that is what the loss column records: movements that were produced,
+acknowledged by the cluster, and never applied to the ledger. Nothing else here
+lost anything.
+
+But A also duplicated. Its guarantee lasts only as long as the offset commit
+itself survives, and a coordinator failover can lose the commit; the records
+then come back and are applied again under fresh posting ids. So at-most-once
+is not a property of the configuration alone. It buys you "no duplicates" only
+while commits are durable, and pays for it with real loss when they are not —
+which is the worst of both outcomes, arrived at honestly.
 
 The zero-sum invariant held in every run of every configuration. Duplicates
 change what the ledger says; they never made it disagree with itself.
