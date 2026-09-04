@@ -53,6 +53,11 @@ type Artefact struct {
 	// Effects is the raw number of postings the consumer wrote, before any
 	// deduplication reasoning.
 	Effects int64 `json:"effects"`
+	// Drained records whether the consumer finished. A run cut off while it
+	// was still applying has a Lost column full of records that were sitting
+	// on the broker intact, so it is not a measurement of anything and Table
+	// refuses it.
+	Drained bool `json:"drained"`
 	// ExactCounts records whether Applied/Lost/Duplicated are exact or net.
 	// Modes without an inbox cannot distinguish a loss from a compensating
 	// duplicate, so their figures are net; presenting those as exact would be
@@ -260,6 +265,16 @@ func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 	}
 	if _, err := KindOf(artefacts); err != nil {
 		return nil, err
+	}
+	for _, a := range artefacts {
+		if !a.Drained {
+			return nil, &ErrMismatchedParameters{
+				Detail: fmt.Sprintf("run %s never drained: the consumer was still "+
+					"applying when the run was cut off, so its Lost column counts "+
+					"records that were intact on the broker. Re-run at a rate the "+
+					"consumer can sustain", a.RunID),
+			}
+		}
 	}
 	key := artefacts[0].fixedKey()
 	for _, a := range artefacts[1:] {

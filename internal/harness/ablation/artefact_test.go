@@ -17,7 +17,7 @@ func base(config consumer.Mode, runID string) Artefact {
 		RunID: runID, Config: config,
 		Seed: 20260903, Profile: "payday", RatePerSec: 1000, DurationSec: 240,
 		Schedule: chaos.DefaultSchedule(), LedgerSHA: "abc123", BrokerVersion: "v24.3.6",
-		Sent: 240_000, Applied: 240_000, InvariantHeld: true,
+		Sent: 240_000, Applied: 240_000, InvariantHeld: true, Drained: true,
 		P50: 1000, P95: 9000, P99: 40_000, LagPeak: 120, DrainSeconds: 3.5,
 	}
 }
@@ -182,7 +182,7 @@ func TestTableRefusesFakeBrokerArtefacts(t *testing.T) {
 				RunID: fmt.Sprintf("smoke-%s-%d", mode, i), Config: mode,
 				Seed: 7, Profile: "steady", RatePerSec: 100, DurationSec: 10,
 				LedgerSHA: "abc", BrokerVersion: BrokerFake + "kfake",
-				Sent: 1000, Applied: 1000, InvariantHeld: true,
+				Sent: 1000, Applied: 1000, InvariantHeld: true, Drained: true,
 			})
 		}
 	}
@@ -209,7 +209,7 @@ func TestTableAcceptsRealBrokerArtefacts(t *testing.T) {
 				RunID: fmt.Sprintf("real-%s-%d", mode, i), Config: mode,
 				Seed: 7, Profile: "steady", RatePerSec: 100, DurationSec: 10,
 				LedgerSHA: "abc", BrokerVersion: "redpanda v24.3.6",
-				Sent: 1000, Applied: 1000, InvariantHeld: true,
+				Sent: 1000, Applied: 1000, InvariantHeld: true, Drained: true,
 			})
 		}
 	}
@@ -219,5 +219,27 @@ func TestTableAcceptsRealBrokerArtefacts(t *testing.T) {
 	}
 	if len(rows) != 3 {
 		t.Fatalf("got %d rows, want 3", len(rows))
+	}
+}
+
+func TestTableRefusesRunsThatNeverDrained(t *testing.T) {
+	// A run cut off mid-drain reports a huge Lost column made of records that
+	// were sitting intact on the broker. The first real-cluster sweep produced
+	// exactly that -- 122,886 "lost" records that had never been consumed --
+	// and every fixed parameter agreed, so nothing else would have stopped it.
+	var arts []Artefact
+	for _, mode := range []consumer.Mode{consumer.AtMostOnce, consumer.AtLeastOnce, consumer.InboxDedup} {
+		for i := 0; i < MinRuns; i++ {
+			a := base(mode, fmt.Sprintf("undrained-%s-%d", mode, i))
+			a.Drained = false
+			arts = append(arts, a)
+		}
+	}
+	_, err := Table(arts, MinRuns)
+	if err == nil {
+		t.Fatal("Table rendered a finding from runs that never drained")
+	}
+	if !strings.Contains(err.Error(), "never drained") {
+		t.Fatalf("error does not name the cause: %v", err)
 	}
 }

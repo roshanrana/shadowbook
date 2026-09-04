@@ -131,6 +131,19 @@ func (c *Consumer) RunOnce(ctx context.Context) (Stats, error) {
 	// configuration A, and it is why it is first in the table.
 	if c.mode == AtMostOnce {
 		if err := c.br.Commit(ctx, records); err != nil {
+			// A broker being killed mid-commit is the experiment, not a fault.
+			// Returning it kills the ledger through the errgroup, which is what
+			// the first real-cluster sweep actually measured: six of nine runs
+			// were the process dying at the second scheduled kill.
+			//
+			// Skipping the batch is also the CORRECT semantics for mode A. Its
+			// contract is that the offset is durable before the effect is
+			// attempted; if the commit did not land, applying now would give
+			// at-least-once behaviour under an at-most-once label.
+			if broker.IsTransient(err) {
+				c.count("commit_deferred")
+				return st, nil
+			}
 			return st, fmt.Errorf("consumer: commit (mode A): %w", err)
 		}
 	}
@@ -157,6 +170,14 @@ func (c *Consumer) RunOnce(ctx context.Context) (Stats, error) {
 	// unit. See the note on Transactional above for where the guarantee ends.
 	if c.mode != AtMostOnce {
 		if err := c.br.Commit(ctx, records); err != nil {
+			// The effects are already applied. An uncommitted offset means
+			// redelivery, which is precisely the condition each mode is defined
+			// by: B duplicates, C and D are suppressed by the inbox. Letting the
+			// process die instead would replace that measurement with nothing.
+			if broker.IsTransient(err) {
+				c.count("commit_deferred")
+				return st, nil
+			}
 			return st, fmt.Errorf("consumer: commit (mode %s): %w", c.mode, err)
 		}
 	}

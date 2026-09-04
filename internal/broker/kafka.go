@@ -193,6 +193,19 @@ type KafkaConsumer struct {
 // had not read.
 func (c *KafkaConsumer) DataLossEvents() int64 { return c.dataLoss.Load() }
 
+// ErrTransient wraps a broker error that will resolve itself: a broker that is
+// down, a leader that moved, a coordinator being re-elected.
+//
+// Callers must NOT treat it as fatal. It exists because the ablation's entire
+// premise is that brokers go away mid-run, so "the broker went away" is the
+// expected condition, not a failure of the ledger.
+var ErrTransient = errors.New("broker: transient failure")
+
+// IsTransient reports whether an error is one the cluster will recover from.
+func IsTransient(err error) bool {
+	return errors.Is(err, ErrTransient) || isRetriable(err) || isDataLoss(err)
+}
+
 // isDataLoss reports whether the cluster lost records the client had not read.
 func isDataLoss(err error) bool {
 	var dl *kgo.ErrDataLoss
@@ -330,6 +343,16 @@ func (c *KafkaConsumer) Commit(ctx context.Context, records []Record) error {
 		rs = append(rs, &kgo.Record{Topic: r.Topic, Partition: r.Partition, Offset: r.Offset})
 	}
 	if err := c.cl.CommitRecords(ctx, rs...); err != nil {
+		// A commit issued to a broker that is being killed fails with a
+		// connection error -- franz-go reports it as "broker closed the
+		// connection immediately... is SASL missing?", which is its generic
+		// text for a handshake-time drop and reads like a misconfiguration.
+		// It is not: it is the chaos schedule doing its job. Marking it
+		// transient is what stops the ledger treating a scheduled broker kill
+		// as a reason to exit.
+		if isRetriable(err) {
+			return fmt.Errorf("%w: commit %d offsets: %w", ErrTransient, len(rs), err)
+		}
 		return fmt.Errorf("broker: commit %d offsets: %w", len(rs), err)
 	}
 	return nil

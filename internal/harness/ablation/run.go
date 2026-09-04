@@ -217,8 +217,8 @@ func (r *Runner) Run(ctx context.Context) ([]Artefact, error) {
 			if _, err := art.Write(r.Spec.OutDir); err != nil {
 				return out, err
 			}
-			r.logf("run %s: sent=%d applied=%d lost=%d duplicated=%d invariant=%v",
-				runID, art.Sent, art.Applied, art.Lost, art.Duplicated, art.InvariantHeld)
+			r.logf("run %s: sent=%d applied=%d lost=%d duplicated=%d drained=%v invariant=%v",
+				runID, art.Sent, art.Applied, art.Lost, art.Duplicated, art.Drained, art.InvariantHeld)
 			out = append(out, art)
 		}
 	}
@@ -329,8 +329,10 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID string) (Art
 	cancelLoad()
 
 	drainStart := r.now()
-	if err := r.waitForDrain(ctx, st, sent, r.Cluster.Seeds(), group); err != nil {
-		r.logf("run %s: drain did not settle: %v", runID, err)
+	drained, drainErr := r.waitForDrain(ctx, st, sent, r.Cluster.Seeds(), group)
+	art.Drained = drained
+	if drainErr != nil {
+		r.logf("run %s: %v", runID, drainErr)
 	}
 	art.DrainSeconds = r.now().Sub(drainStart).Seconds()
 	if lag, err := broker.GroupLag(ctx, r.Cluster.Seeds(), group); err == nil {
@@ -417,57 +419,60 @@ func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uui
 	return sent, nil
 }
 
-// waitForDrain blocks until the consumer has finished, or has demonstrably
-// stopped.
+// waitForDrain blocks until the consumer has finished, and reports whether it
+// actually did.
 //
-// The first version watched only the applied count and called the run drained
-// after three quiet seconds. That is wrong while a broker is down: the consumer
-// is reconnecting and refetching metadata, applies nothing for several seconds,
-// and the backlog it is about to process gets recorded as permanent loss. The
-// symptom was a loss column that did not correlate with the delivery mode --
-// the same configuration losing everything in one run and nothing in the next.
+// The first version capped total wait at three minutes and returned an error if
+// the consumer was STILL PROGRESSING when the cap expired. At 240k movements
+// per run that happened constantly -- the consumer was working through a
+// backlog at a few hundred a second -- and the backlog it had not yet reached
+// was then recorded as permanent loss. One run reported 122,886 "lost" records
+// that were sitting on the broker, waiting, entirely intact.
 //
-// Group lag is the honest signal. Records still sitting unread on the broker
-// are not lost, whatever the consumer is doing at this instant, so the run is
-// only over when lag reaches zero or the consumer stops making progress for
-// long enough that it is not coming back.
-func (r *Runner) waitForDrain(ctx context.Context, st *store.Store, sent int64, seeds []string, group string) error {
+// The cap now bounds STALLS, not progress. A consumer that is still applying is
+// given time; one that has stopped applying while records remain is not. The
+// absolute ceiling exists only so a wedged run cannot hang a sweep forever, and
+// reaching it means the run did not drain -- which is reported as such rather
+// than being quietly folded into the loss column.
+func (r *Runner) waitForDrain(ctx context.Context, st *store.Store, sent int64, seeds []string, group string) (bool, error) {
 	const (
-		quiet = 20 * time.Second // must exceed broker failover, or a stall reads as loss
-		limit = 3 * time.Minute
+		stall   = 30 * time.Second // no progress AND records outstanding
+		ceiling = 20 * time.Minute // a wedged run must not hang the sweep
 	)
-	deadline := r.now().Add(limit)
+	deadline := r.now().Add(ceiling)
 	var last int64
 	lastChange := r.now()
 
 	for r.now().Before(deadline) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return false, ctx.Err()
 		case <-time.After(500 * time.Millisecond):
 		}
 		n, err := appliedCount(ctx, st)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if n != last {
 			last, lastChange = n, r.now()
 		}
 
 		// Nothing left on the broker: the consumer is genuinely finished, and
-		// whatever did not land was dropped by the delivery mode, which is the
+		// whatever did not land was dropped by the delivery mode. That is the
 		// measurement.
 		if lag, err := broker.GroupLag(ctx, seeds, group); err == nil && lag == 0 && n > 0 {
-			return nil
+			return true, nil
 		}
 		if n >= sent {
-			return nil
+			return true, nil
 		}
-		if r.now().Sub(lastChange) >= quiet {
-			return fmt.Errorf("consumer applied nothing for %s with %d of %d applied", quiet, n, sent)
+		if r.now().Sub(lastChange) >= stall {
+			// Stopped applying with records outstanding. Whatever it did not
+			// take is genuinely lost to this configuration.
+			return true, nil
 		}
 	}
-	return fmt.Errorf("still moving after %s", limit)
+	return false, fmt.Errorf("still applying after %s; the run did not drain", ceiling)
 }
 
 func appliedCount(ctx context.Context, st *store.Store) (int64, error) {

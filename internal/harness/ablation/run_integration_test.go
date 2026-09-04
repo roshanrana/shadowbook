@@ -35,6 +35,9 @@ func (f fakeCluster) Seeds() []string      { return f.seeds }
 func (f fakeCluster) Version() string      { return ablation.BrokerFake + "kfake" }
 func (f fakeCluster) Docker() chaos.Docker { return nil }
 
+// Replicas is 1: a single in-process broker cannot replicate anything.
+func (f fakeCluster) Replicas() int16 { return 1 }
+
 func adminDSN(t *testing.T) string {
 	t.Helper()
 	dsn := os.Getenv("SHADOWBOOK_LEDGER_DSN")
