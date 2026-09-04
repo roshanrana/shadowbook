@@ -63,11 +63,28 @@ services:
       - --check=false
       - --kafka-addr=PLAINTEXT://0.0.0.0:9092
       - --advertise-kafka-addr=PLAINTEXT://localhost:9092
-      - --set=redpanda.default_topic_replications=1
-      - --set=redpanda.unclean_leader_election_enabled=false
     ports: ["9092:9092", "9644:9644"]
 
-  # --- chaos profile: three brokers, RF=3, min.insync.replicas=2 -------------
+  # --- chaos profile: three brokers ------------------------------------------
+  #
+  # No --set flags here, deliberately. `--set redpanda.X` writes NODE config,
+  # and every property this profile used to set is a CLUSTER property:
+  #
+  #   enable_idempotence            cluster, defaults true  -- and rpk passes
+  #                                 this one through to the broker binary,
+  #                                 which rejects it and restart-loops
+  #   enable_transactions           cluster, defaults true
+  #   default_topic_replications    cluster, defaults 1
+  #   minimum_topic_replications    cluster
+  #   unclean_leader_election_...   does not exist in Redpanda at all; that is
+  #                                 a Kafka property name and was always inert
+  #
+  # The two guarantees the ablation actually needs are held elsewhere and are
+  # verified rather than asserted: idempotent produce is a franz-go producer
+  # option (internal/broker/kafka.go), and replication factor 3 is passed
+  # explicitly at topic creation by the runner (Cluster.Replicas). Anything
+  # genuinely needed at cluster scope belongs in `rpk cluster config set`
+  # after start-up, not in a start flag that is silently ignored.
   redpanda-1: &rp1
     <<: *redpanda-common
     profiles: ["chaos"]
@@ -95,16 +112,12 @@ services:
       - --advertise-kafka-addr=INTERNAL://redpanda-1:9092,EXTERNAL://localhost:19092
       - --rpc-addr=0.0.0.0:33145
       - --advertise-rpc-addr=redpanda-1:33145
-      - --set=redpanda.default_topic_replications=3
-      - --set=redpanda.minimum_topic_replications=3
-      - --set=redpanda.unclean_leader_election_enabled=false
       # enable_idempotence is deliberately NOT set here. rpk consumes every
       # other --set flag into redpanda.yaml but passes this one through to the
       # broker binary, which rejects it -- "unrecognised option" -- and the
       # container restart-loops. Idempotent produce is on by default in v24 and
       # franz-go requests it per-producer regardless (see internal/broker),
       # so nothing is lost by omitting it.
-      - --set=redpanda.enable_transactions=true
     ports: ["19092:19092"]
 
   redpanda-2:
@@ -135,16 +148,12 @@ services:
       - --rpc-addr=0.0.0.0:33145
       - --advertise-rpc-addr=redpanda-2:33145
       - --seeds=redpanda-1:33145
-      - --set=redpanda.default_topic_replications=3
-      - --set=redpanda.minimum_topic_replications=3
-      - --set=redpanda.unclean_leader_election_enabled=false
       # enable_idempotence is deliberately NOT set here. rpk consumes every
       # other --set flag into redpanda.yaml but passes this one through to the
       # broker binary, which rejects it -- "unrecognised option" -- and the
       # container restart-loops. Idempotent produce is on by default in v24 and
       # franz-go requests it per-producer regardless (see internal/broker),
       # so nothing is lost by omitting it.
-      - --set=redpanda.enable_transactions=true
     ports: ["29092:29092"]
     depends_on: [redpanda-1]
 
@@ -176,16 +185,12 @@ services:
       - --rpc-addr=0.0.0.0:33145
       - --advertise-rpc-addr=redpanda-3:33145
       - --seeds=redpanda-1:33145
-      - --set=redpanda.default_topic_replications=3
-      - --set=redpanda.minimum_topic_replications=3
-      - --set=redpanda.unclean_leader_election_enabled=false
       # enable_idempotence is deliberately NOT set here. rpk consumes every
       # other --set flag into redpanda.yaml but passes this one through to the
       # broker binary, which rejects it -- "unrecognised option" -- and the
       # container restart-loops. Idempotent produce is on by default in v24 and
       # franz-go requests it per-producer regardless (see internal/broker),
       # so nothing is lost by omitting it.
-      - --set=redpanda.enable_transactions=true
     ports: ["39092:39092"]
     depends_on: [redpanda-1]
 
