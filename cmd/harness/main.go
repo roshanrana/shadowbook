@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/roshanrana/shadowbook/internal/harness/ablation"
 	"github.com/roshanrana/shadowbook/internal/harness/chaos"
@@ -71,11 +73,24 @@ func ablate(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("ablate", flag.ContinueOnError)
 	runs := fs.Int("runs", ablation.MinRuns, "runs per configuration")
 	out := fs.String("out", "reports/runs", "artefact directory")
+	brokers := fs.String("brokers", envOr("SHADOWBOOK_BROKERS", "localhost:19092,localhost:29092,localhost:39092"),
+		"comma-separated Kafka seed brokers")
+	brokerVersion := fs.String("broker-version", envOr("SHADOWBOOK_BROKER_VERSION", "redpanda v24.3.6"),
+		"recorded in every artefact; runs against different broker builds are not comparable")
+	dsn := fs.String("dsn", envOr("SHADOWBOOK_LEDGER_DSN", ""), "admin DSN; each run gets its own database")
+	binary := fs.String("ledger", envOr("SHADOWBOOK_LEDGER_BIN", "bin/ledger"), "compiled ledger binary")
+	seed := fs.Int64("seed", 20260904, "fixed across every run in a table")
+	rate := fs.Int("rate", 1000, "movements per second (NFR-1a)")
+	duration := fs.Duration("duration", 4*time.Minute, "load duration per run")
+	sha := fs.String("ledger-sha", "", "recorded in every artefact")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *runs < ablation.MinRuns {
 		return fmt.Errorf("runs must be at least %d: a single run of a chaotic system is an anecdote", ablation.MinRuns)
+	}
+	if *dsn == "" {
+		return errors.New("no DSN: set SHADOWBOOK_LEDGER_DSN or pass -dsn")
 	}
 
 	cli := chaos.NewCLI()
@@ -88,11 +103,40 @@ func ablate(ctx context.Context, args []string) error {
 		return fmt.Errorf("no docker daemon: %s", detail)
 	}
 
-	fmt.Fprintf(os.Stderr,
-		"Artefact schema, the fixed-parameter guard, the chaos scheduler and all four\n"+
-			"consumer modes are complete and tested. What is missing is the orchestration\n"+
-			"that starts the ledger per configuration, drives load through it and collects\n"+
-			"the measurements. See docs/ship-report.md.\n"+
-			"Would write %d runs per configuration to %s\n", *runs, *out)
-	return errors.New("ablation execution path not implemented (T-048)")
+	schedule := chaos.DefaultSchedule()
+	if err := chaos.Validate(schedule); err != nil {
+		return err
+	}
+
+	r := &ablation.Runner{
+		Cluster: ablation.RealCluster{
+			Addrs: strings.Split(*brokers, ","), Ver: *brokerVersion, Control: cli,
+		},
+		Logf: func(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) },
+		Spec: ablation.Spec{
+			Runs: *runs, Seed: *seed, Profile: "payday",
+			Rate: *rate, Duration: *duration, Schedule: schedule,
+			AdminDSN: *dsn, LedgerBinary: *binary, OutDir: *out, LedgerSHA: *sha,
+		},
+	}
+	arts, err := r.Run(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "wrote %d artefacts to %s\n", len(arts), *out)
+
+	// Fold immediately. A sweep that cannot become a table should say so now,
+	// while the cluster is still up and the run can be repeated, rather than at
+	// `make report` time after everything has been torn down.
+	if _, err := ablation.Table(arts, ablation.MinRuns); err != nil {
+		return fmt.Errorf("artefacts written, but they do not form a table: %w", err)
+	}
+	return nil
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

@@ -59,8 +59,20 @@ if have docker && docker info >/dev/null 2>&1; then
 else
   row "docker" "MISSING" "the three-broker chaos profile needs a daemon"; ablate_ok=0
 fi
-row "ablation runner" "TODO" "orchestration not implemented (T-048, ship-report §4)"
-ablate_ok=0
+row "ablation runner" "ok" "implemented; verified end to end against kfake (D-020)"
+
+# The runner exists now, so the remaining question is whether there is a real
+# cluster to point it at. Checked rather than assumed: a reachable broker is
+# the difference between a measurement and a harness check, and this script
+# exists so nobody has to guess which one they are about to get.
+seed_broker=${SHADOWBOOK_BROKERS-}
+seed_broker=${seed_broker%%,*}
+seed_broker=${seed_broker:-localhost:19092}
+if (exec 3<>"/dev/tcp/${seed_broker%%:*}/${seed_broker##*:}") 2>/dev/null; then
+  row "broker" "ok" "$seed_broker answering"
+else
+  row "broker" "MISSING" "no broker at $seed_broker -- run: make up-chaos"; ablate_ok=0
+fi
 
 echo
 [ "$demo_ok"   -eq 1 ] && echo "make demo:   READY"   || echo "make demo:   blocked -- see TIER 1"

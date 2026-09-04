@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -37,6 +38,34 @@ type KafkaConfig struct {
 func (c KafkaConfig) validate() error {
 	if len(c.Seeds) == 0 {
 		return errors.New("broker: no seed brokers configured")
+	}
+	return nil
+}
+
+// EnsureTopic creates a topic, treating "already exists" as success.
+//
+// The ablation gives each run its own topic and therefore has to create it.
+// Relying on the broker's auto-creation instead would make the experiment
+// depend on a cluster-wide setting that is off by default in production
+// Redpanda -- the run would simply produce nothing and report total loss,
+// which looks exactly like the result the experiment is trying to measure.
+func EnsureTopic(ctx context.Context, seeds []string, topic string, partitions int32, replicas int16) error {
+	cl, err := kgo.NewClient(kgo.SeedBrokers(seeds...), kgo.ClientID("shadowbook-admin"))
+	if err != nil {
+		return fmt.Errorf("broker: admin client: %w", err)
+	}
+	defer cl.Close()
+
+	adm := kadm.NewClient(cl)
+	resp, err := adm.CreateTopic(ctx, partitions, replicas, nil, topic)
+	if err != nil {
+		if errors.Is(err, kerr.TopicAlreadyExists) {
+			return nil
+		}
+		return fmt.Errorf("broker: create topic %s: %w", topic, err)
+	}
+	if resp.Err != nil && !errors.Is(resp.Err, kerr.TopicAlreadyExists) {
+		return fmt.Errorf("broker: create topic %s: %w", topic, resp.Err)
 	}
 	return nil
 }

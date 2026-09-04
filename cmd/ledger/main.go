@@ -47,6 +47,7 @@ func run() error {
 		invEvery   = flag.Duration("invariant-interval", 500*time.Millisecond, "invariant check interval")
 		brokers    = flag.String("brokers", envOr("SHADOWBOOK_BROKERS", ""), "comma-separated Kafka seed brokers; empty means the in-process fake")
 		group      = flag.String("group", envOr("SHADOWBOOK_GROUP", ""), "consumer group id; defaults to shadowbook-<mode>")
+		topic      = flag.String("topic", envOr("SHADOWBOOK_MOVEMENTS_TOPIC", movementsTopic), "movements topic to consume")
 	)
 	flag.Parse()
 
@@ -96,7 +97,7 @@ func run() error {
 	// consumer are always running: their behaviour is what Finding 2 measures,
 	// and a ledger that only wires them up under a flag would be a different
 	// program from the one under test.
-	prod, cons, kind, err := dialBroker(*brokers, *group, *mode)
+	prod, cons, kind, err := dialBroker(*brokers, *group, *mode, *topic)
 	if err != nil {
 		return err
 	}
@@ -104,7 +105,7 @@ func run() error {
 
 	relay := outbox.New(st, prod, outbox.Options{Topic: postingsTopic})
 	movements, err := consumer.New(st, cons, consumer.Options{
-		Mode: consumer.Mode(*mode), Topic: movementsTopic, Metrics: metrics,
+		Mode: consumer.Mode(*mode), Topic: *topic, Metrics: metrics,
 	})
 	if err != nil {
 		return err
@@ -155,7 +156,7 @@ const (
 // brokers the franz-go clients are used. The relay and the consumer are wired
 // identically either way -- the only difference is what they are talking to,
 // which is the point.
-func dialBroker(seeds, group, mode string) (broker.Producer, broker.Consumer, string, error) {
+func dialBroker(seeds, group, mode, topic string) (broker.Producer, broker.Consumer, string, error) {
 	if strings.TrimSpace(seeds) == "" {
 		bus := broker.NewFake()
 		return bus, bus, "in-process fake", nil
@@ -178,7 +179,7 @@ func dialBroker(seeds, group, mode string) (broker.Producer, broker.Consumer, st
 		return nil, nil, "", err
 	}
 	cons, err := broker.NewKafkaConsumer(broker.KafkaConfig{
-		Seeds: addrs, Group: group, Topics: []string{movementsTopic},
+		Seeds: addrs, Group: group, Topics: []string{topic},
 		ClientID: "shadowbook-consumer-" + mode,
 	})
 	if err != nil {
