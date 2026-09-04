@@ -204,13 +204,29 @@ func (r *Runner) Run(ctx context.Context) ([]Artefact, error) {
 		}
 	}
 
+	// One id for this whole sweep, mixed into every topic and group name.
+	//
+	// Per-RUN uniqueness is not enough, and the second real-cluster sweep is
+	// the proof: run ids repeat between sweeps ("payday-C-1" every time), so
+	// the second sweep reused the first sweep's topics and consumer groups.
+	// Its mode C runs then consumed leftover records from a previous
+	// experiment and reported applying MORE movements than were ever sent --
+	// 44,746 against 36,000. A and B hid it, because their counts are capped
+	// at `sent`; the surplus surfaced in their duplication column instead.
+	//
+	// The broker outlives the process, so isolation has to be per EXPERIMENT,
+	// not per run. Same lesson as the per-run database: the thing that
+	// persists is the thing that contaminates.
+	sweep := r.sweepID()
+	r.logf("sweep %s", sweep)
+
 	var out []Artefact
 	for _, mode := range r.Spec.Configs {
 		for i := 0; i < r.Spec.Runs; i++ {
 			runID := fmt.Sprintf("%s-%s-%d", r.Spec.Profile, mode, i+1)
 			r.logf("run %s starting", runID)
 
-			art, err := r.one(ctx, mode, runID)
+			art, err := r.one(ctx, mode, runID, sweep)
 			if err != nil {
 				return out, fmt.Errorf("ablation: run %s: %w", runID, err)
 			}
@@ -226,13 +242,21 @@ func (r *Runner) Run(ctx context.Context) ([]Artefact, error) {
 }
 
 // one executes a single (configuration, run) pair.
-func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID string) (Artefact, error) {
+// sweepID is unique per invocation. It is recorded in every artefact and is
+// part of the fixed-parameter key, so two sweeps can never be folded into one
+// table even if every other parameter agrees.
+func (r *Runner) sweepID() string {
+	return fmt.Sprintf("s%d", r.now().UTC().Unix())
+}
+
+func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID, sweep string) (Artefact, error) {
 	art := Artefact{
 		RunID: runID, Config: mode,
 		Seed: r.Spec.Seed, Profile: r.Spec.Profile,
 		RatePerSec: r.Spec.Rate, DurationSec: int(r.Spec.Duration.Seconds()),
 		Schedule: r.Spec.Schedule, LedgerSHA: r.Spec.LedgerSHA,
 		BrokerVersion: r.Cluster.Version(),
+		SweepID:       sweep,
 	}
 
 	dsn, drop, err := provision(ctx, r.Spec.AdminDSN, runID)
@@ -248,8 +272,8 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID string) (Art
 	// every record run 1 had produced. Runs then contaminate each other's
 	// counts, which is exactly the isolation failure the per-run database was
 	// introduced to prevent -- the database was isolated and the log was not.
-	group := "sb-" + strings.ToLower(runID)
-	topic := "shadowbook.movements." + strings.ToLower(runID) + ".v1"
+	group := "sb-" + sweep + "-" + strings.ToLower(runID)
+	topic := "shadowbook.movements." + sweep + "-" + strings.ToLower(runID) + ".v1"
 
 	st, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -505,6 +529,17 @@ func measure(ctx context.Context, st *store.Store, art *Artefact) error {
 	if err := st.Pool.QueryRow(ctx,
 		`SELECT count(*) FROM postings WHERE principal = 'consumer'`).Scan(&postings); err != nil {
 		return fmt.Errorf("ablation: count postings: %w", err)
+	}
+
+	// More distinct movements applied than were ever produced is not a result,
+	// it is contamination: the consumer read records this run did not send.
+	// The second real-cluster sweep reported 44,746 applied against 36,000
+	// sent, because it inherited a previous sweep's topic. Caught here it costs
+	// one run; unnoticed it produces a table nobody can tell is wrong.
+	if inbox > art.Sent && art.Sent > 0 {
+		return fmt.Errorf("ablation: %d distinct movements applied but only %d sent -- "+
+			"the consumer read records from outside this run (a reused topic or "+
+			"consumer group)", inbox, art.Sent)
 	}
 
 	switch art.Config {

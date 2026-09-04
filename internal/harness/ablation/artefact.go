@@ -28,14 +28,18 @@ type Artefact struct {
 	Config consumer.Mode `json:"config"`
 
 	// --- fixed parameters: these MUST agree across every artefact in a table
-	Seed          int64          `json:"seed"`
-	Profile       string         `json:"profile"`
-	RatePerSec    int            `json:"rate_per_sec"`
-	DurationSec   int            `json:"duration_sec"`
-	Schedule      []chaos.Event  `json:"schedule"`
-	LedgerSHA     string         `json:"ledger_sha"`
-	BrokerVersion string         `json:"broker_version"`
-	Executed      []chaos.Record `json:"executed_schedule"`
+	Seed          int64         `json:"seed"`
+	Profile       string        `json:"profile"`
+	RatePerSec    int           `json:"rate_per_sec"`
+	DurationSec   int           `json:"duration_sec"`
+	Schedule      []chaos.Event `json:"schedule"`
+	LedgerSHA     string        `json:"ledger_sha"`
+	BrokerVersion string        `json:"broker_version"`
+	// SweepID identifies the invocation. Two sweeps are never comparable even
+	// when every other parameter agrees, because the cluster carries state
+	// between them.
+	SweepID  string         `json:"sweep_id"`
+	Executed []chaos.Record `json:"executed_schedule"`
 
 	// --- measurements
 	Sent          int64   `json:"sent"`
@@ -68,8 +72,8 @@ type Artefact struct {
 // fixedKey is everything that must match across a table.
 func (a Artefact) fixedKey() string {
 	sched, _ := json.Marshal(a.Schedule)
-	return fmt.Sprintf("%d|%s|%d|%d|%s|%s|%s",
-		a.Seed, a.Profile, a.RatePerSec, a.DurationSec, a.LedgerSHA, a.BrokerVersion, sched)
+	return fmt.Sprintf("%d|%s|%d|%d|%s|%s|%s|%s",
+		a.Seed, a.Profile, a.RatePerSec, a.DurationSec, a.LedgerSHA, a.BrokerVersion, a.SweepID, sched)
 }
 
 // Write persists an artefact under reports/runs/<run_id>/artefact.json.
