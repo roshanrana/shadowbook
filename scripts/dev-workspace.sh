@@ -24,6 +24,13 @@ cd "$(dirname "$0")/.."
 RESUMING=0
 [[ -f go.work ]] && RESUMING=1
 
+# Read the language version from go.mod rather than hard-coding it. A workspace
+# declaring an older Go than the module requires is rejected outright, and
+# `go mod tidy` raises the module's floor whenever a dependency does -- which is
+# exactly what happened when franz-go's kfake pulled it from 1.23 to 1.23.8.
+GOVERSION=$(awk '/^go /{print $2; exit}' go.mod)
+: "${GOVERSION:=1.23}"
+
 # vanity path -> GitHub mirror. Versions are read from go.mod so this file can
 # never drift from it: a bumped dependency needs no edit here.
 declare -A MIRROR=(
@@ -42,6 +49,8 @@ declare -A MIRROR=(
     [google.golang.org/protobuf]=github.com/protocolbuffers/protobuf-go
     [gopkg.in/yaml.v3]=github.com/go-yaml/yaml/v3
     [gopkg.in/check.v1]=github.com/go-check/check
+    [gonum.org/v1/gonum]=github.com/gonum/gonum
+    [gonum.org/v1/netlib]=github.com/gonum/netlib
 )
 
 version_of() { # module path -> version in go.mod, empty if absent
@@ -52,7 +61,7 @@ if (( RESUMING )); then
     echo "go.work exists -- resuming resolution rather than rebuilding it."
 else
 {
-    echo "go 1.23"
+    echo "go $GOVERSION"
     echo
     echo "use ."
     echo
@@ -93,9 +102,13 @@ for _ in $(seq 1 25); do
     # failed. Anchor on "unrecognized import path" so the requiring module is
     # never mistaken for the missing one -- that mistake reads as "already
     # replaced but still unresolved" and aborts a run that was fine.
+    #
+    # Host-agnostic on purpose. An earlier version matched a fixed list of
+    # vanity hosts and broke the first time the graph pulled a new one
+    # (gonum.org, via vegeta's tdigest). What identifies the failure is the
+    # message, not the hostname.
     missing=$(printf '%s\n' "$err" \
-        | grep 'unrecognized import path' \
-        | grep -oE '(golang\.org|google\.golang\.org|gopkg\.in)/[^@ ]+@v[^:]+' \
+        | sed -n 's/^[[:space:]]*\([^[:space:]]*\)@\([^:]*\): unrecognized import path.*/\1@\2/p' \
         | head -1 || true)
     [[ -n "$missing" ]] || { printf '%s\n' "$err" >&2; echo "dev-workspace: build failed for a reason this script cannot fix" >&2; exit 1; }
 
@@ -114,7 +127,7 @@ for _ in $(seq 1 25); do
     # Insert before the closing paren, then re-sort the block for determinism.
     sed -i "s|^)\$|\t$path => $mirror $ver\n)|" go.work
     body=$(sed -n '/^replace ($/,/^)$/p' go.work | sed '1d;$d' | sort)
-    printf 'go 1.23\n\nuse .\n\nreplace (\n%s\n)\n' "$body" > go.work
+    printf 'go %s\n\nuse .\n\nreplace (\n%s\n)\n' "$GOVERSION" "$body" > go.work
     added=$((added + 1))
 done
 

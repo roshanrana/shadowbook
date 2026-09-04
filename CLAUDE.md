@@ -27,7 +27,7 @@ The project brief is `docs/shadowbook-project-brief.md`. It is Phase 0 input. Wh
 
 ## Languages and layout
 
-- **Go 1.23+** for `ledger` and anything on the hot path or at the I/O edge. Table-driven tests; `go test -race` in `make check`; `errgroup` for fan-out; `ctx.Done()` in every blocking select; no goroutine without a cancellation path.
+- **Go 1.23.8+** for `ledger` and anything on the hot path or at the I/O edge. Table-driven tests; `go test -race` in `make check`; `errgroup` for fan-out; `ctx.Done()` in every blocking select; no goroutine without a cancellation path.
 - **Python 3.12+ / uv** for `legacy-sim`, `reconcile`, and report rendering. `ruff` + `mypy --strict`. `pytest`.
 - **Protobuf** for event contracts, generated for both languages, checked in.
 - **Redpanda** (Kafka API) via Docker Compose; **PostgreSQL 16**.

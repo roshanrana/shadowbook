@@ -4,7 +4,7 @@ Do these in order. Thirty minutes, most of it downloads.
 
 ## 1. Machine
 
-    # Go 1.23+  (https://go.dev/dl)          go version
+    # Go 1.23.8+  (https://go.dev/dl)        go version
     # Docker + compose v2                     docker compose version
     # uv (Python 3.12+ manager)               curl -LsSf https://astral.sh/uv/install.sh | sh
     # protoc + protoc-gen-go  (make proto / gen-check use these directly)

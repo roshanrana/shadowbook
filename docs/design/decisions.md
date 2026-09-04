@@ -185,3 +185,14 @@ Mini-ADRs. Newest at the bottom. Never edit an accepted entry; supersede it with
 **Context:** The first measurement counted `duplicated` as `postings − applied`, which is identically zero for modes A and B: neither keeps an inbox, and both mint a fresh posting id per delivery, so nothing in the ledger ties an effect back to a movement. Mode B was observed applying 26,221 effects for 12,000 movements and reporting **zero** duplicates.
 **Decision:** For C and D, `Applied` comes from the inbox and the counts are exact. For A and B they are **net**: `Duplicated = max(0, effects − sent)` and `Lost = max(0, sent − effects)`. Every artefact carries `ExactCounts`, and the report states the distinction wherever the figures are net.
 **Consequences:** A run that lost 100 movements and applied 100 others twice is indistinguishable from a clean one under A and B. That is not a harness limitation to apologise for but the operational consequence of running without an inbox: without one the ledger cannot answer "was this applied twice?" at all — which is itself an argument for configuration C.
+
+## D-027 — `go.sum` exists, and the Go floor rose to 1.23.8
+
+**Status:** accepted (implementation, 2026-09-04) — **discharges the D-016 obligation**
+**Context:** D-016 left `go.sum` ungenerated because no module proxy was reachable from the build environment, and recorded that regenerating it was not optional: the tree had been built with `GOSUMDB=off`, a real reduction in supply-chain verification. `go mod tidy` has now run on a networked machine with the checksum database enabled.
+**Decision:** Commit the generated `go.sum` (93 entries) and the `go.mod` that `tidy` produced.
+**Consequences:** Three things changed that were not asked for and are worth stating rather than absorbing:
+1. **The Go floor moved from `1.23` to `1.23.8`**, because `franz-go/pkg/kfake` and `pkg/kadm` declare it. SETUP.md and CLAUDE.md are updated to match. This is the third time a dependency has moved the floor (D-019 pgx, D-020 franz-go), and it is the mechanism to watch: the floor is set by the strictest dependency, not by the project.
+2. `golang.org/x/crypto` rose v0.31.0 → v0.38.0, as D-020 predicted, along with `x/sync`, `x/sys` and `x/text`. All are forward moves.
+3. The `// indirect` block now exists, which `go.mod` had been missing entirely.
+Verified after adopting the tidied module: `go build ./...`, `golangci-lint` (0 issues) and the full unit suite all pass. `scripts/dev-workspace.sh` needed two fixes to cope — it hard-coded `go 1.23` in the generated workspace, which Go rejects outright when the module requires more, and its error extractor matched a fixed list of vanity hosts and broke on the first new one (`gonum.org`, via vegeta's tdigest). Both are now derived rather than hard-coded.
