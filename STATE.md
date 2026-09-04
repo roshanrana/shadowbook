@@ -60,7 +60,7 @@ available hardware.
      duplication but no timings. Combines with (2) into one run.
   4. **Measure NFR-1 on real hardware**: `SHADOWBOOK_PERF_RATE=2000 make perf`.
      Not met in the build environment (~1,584/s saturated).
-- **Before an interview:** `git tag round-2`. Both findings stand on their own,
+- **Before sharing it for review:** `git tag round-2`. Both findings stand on their own,
   and the ship report says exactly what is and is not measured.
 
 ## Milestones (provisional — finalised in Phase 3)
