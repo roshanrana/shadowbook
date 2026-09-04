@@ -98,8 +98,13 @@ services:
       - --set=redpanda.default_topic_replications=3
       - --set=redpanda.minimum_topic_replications=3
       - --set=redpanda.unclean_leader_election_enabled=false
+      # enable_idempotence is deliberately NOT set here. rpk consumes every
+      # other --set flag into redpanda.yaml but passes this one through to the
+      # broker binary, which rejects it -- "unrecognised option" -- and the
+      # container restart-loops. Idempotent produce is on by default in v24 and
+      # franz-go requests it per-producer regardless (see internal/broker),
+      # so nothing is lost by omitting it.
       - --set=redpanda.enable_transactions=true
-      - --set=redpanda.enable_idempotence=true
     ports: ["19092:19092"]
 
   redpanda-2:
@@ -133,8 +138,13 @@ services:
       - --set=redpanda.default_topic_replications=3
       - --set=redpanda.minimum_topic_replications=3
       - --set=redpanda.unclean_leader_election_enabled=false
+      # enable_idempotence is deliberately NOT set here. rpk consumes every
+      # other --set flag into redpanda.yaml but passes this one through to the
+      # broker binary, which rejects it -- "unrecognised option" -- and the
+      # container restart-loops. Idempotent produce is on by default in v24 and
+      # franz-go requests it per-producer regardless (see internal/broker),
+      # so nothing is lost by omitting it.
       - --set=redpanda.enable_transactions=true
-      - --set=redpanda.enable_idempotence=true
     ports: ["29092:29092"]
     depends_on: [redpanda-1]
 
@@ -169,8 +179,13 @@ services:
       - --set=redpanda.default_topic_replications=3
       - --set=redpanda.minimum_topic_replications=3
       - --set=redpanda.unclean_leader_election_enabled=false
+      # enable_idempotence is deliberately NOT set here. rpk consumes every
+      # other --set flag into redpanda.yaml but passes this one through to the
+      # broker binary, which rejects it -- "unrecognised option" -- and the
+      # container restart-loops. Idempotent produce is on by default in v24 and
+      # franz-go requests it per-producer regardless (see internal/broker),
+      # so nothing is lost by omitting it.
       - --set=redpanda.enable_transactions=true
-      - --set=redpanda.enable_idempotence=true
     ports: ["39092:39092"]
     depends_on: [redpanda-1]
 
