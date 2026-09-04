@@ -7,17 +7,20 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/roshanrana/shadowbook/internal/harness/ablation"
 	"github.com/roshanrana/shadowbook/internal/harness/chaos"
+	"github.com/roshanrana/shadowbook/internal/ledger/consumer"
 )
 
 func main() {
@@ -29,7 +32,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: harness <ablate|preflight> [flags]")
+		return errors.New("usage: harness <ablate|fold|preflight> [flags]")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -39,6 +42,8 @@ func run(args []string) error {
 		return preflight(ctx)
 	case "ablate":
 		return ablate(ctx, args[1:])
+	case "fold":
+		return fold(args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -83,6 +88,10 @@ func ablate(ctx context.Context, args []string) error {
 	rate := fs.Int("rate", 1000, "movements per second (NFR-1a)")
 	duration := fs.Duration("duration", 4*time.Minute, "load duration per run")
 	sha := fs.String("ledger-sha", "", "recorded in every artefact")
+	simulated := fs.Bool("simulated", false,
+		"run against an in-process multi-broker cluster instead of Docker; results are labelled simulated and can never render as Finding 2")
+	simBrokers := fs.Int("sim-brokers", 3, "brokers in the simulated cluster")
+	configs := fs.String("configs", "A,B,C", "comma-separated delivery modes to run")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -93,28 +102,48 @@ func ablate(ctx context.Context, args []string) error {
 		return errors.New("no DSN: set SHADOWBOOK_LEDGER_DSN or pass -dsn")
 	}
 
-	cli := chaos.NewCLI()
-	if ok, detail := cli.Available(ctx); !ok {
-		fmt.Fprintln(os.Stderr,
-			"The ablation measures a real three-broker cluster being killed under load;\n"+
-				"there is no meaningful way to fake it. Run `make up-chaos` on a machine\n"+
-				"with Docker, then `make ablate`. Until then `make report` correctly renders\n"+
-				"Finding 2 as 'not run'")
-		return fmt.Errorf("no docker daemon: %s", detail)
-	}
-
-	schedule := chaos.DefaultSchedule()
+	// The schedule is scaled to the run length so a shorter sweep executes the
+	// same shape rather than an improvised one.
+	schedule := chaos.Scale(chaos.DefaultSchedule(), *duration)
 	if err := chaos.Validate(schedule); err != nil {
 		return err
 	}
 
-	r := &ablation.Runner{
-		Cluster: ablation.RealCluster{
+	var cluster ablation.Cluster
+	if *simulated {
+		sim, err := ablation.NewSimCluster(*simBrokers)
+		if err != nil {
+			return err
+		}
+		defer sim.Close()
+		fmt.Fprintf(os.Stderr,
+			"SIMULATED CLUSTER: %d in-process brokers on real sockets, killed and\n"+
+				"restarted on the chaos schedule. This measures the delivery modes under\n"+
+				"broker failover, but there is no replication, no ISR and no disk, so it\n"+
+				"is NOT Finding 2 and `make report` will label it as simulated.\n\n",
+			*simBrokers)
+		cluster = sim
+	} else {
+		cli := chaos.NewCLI()
+		if ok, detail := cli.Available(ctx); !ok {
+			fmt.Fprintln(os.Stderr,
+				"The ablation measures a real three-broker cluster being killed under load.\n"+
+					"Run `make up-chaos` on a machine with Docker, then `make ablate`.\n"+
+					"For a runnable approximation with no Docker, use `make ablate-sim`,\n"+
+					"whose results are labelled simulated and never render as Finding 2.")
+			return fmt.Errorf("no docker daemon: %s", detail)
+		}
+		cluster = ablation.RealCluster{
 			Addrs: strings.Split(*brokers, ","), Ver: *brokerVersion, Control: cli,
-		},
-		Logf: func(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) },
+		}
+	}
+
+	r := &ablation.Runner{
+		Cluster: cluster,
+		Logf:    func(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) },
 		Spec: ablation.Spec{
-			Runs: *runs, Seed: *seed, Profile: "payday",
+			Configs: parseModes(*configs),
+			Runs:    *runs, Seed: *seed, Profile: "payday",
 			Rate: *rate, Duration: *duration, Schedule: schedule,
 			AdminDSN: *dsn, LedgerBinary: *binary, OutDir: *out, LedgerSHA: *sha,
 		},
@@ -132,6 +161,78 @@ func ablate(ctx context.Context, args []string) error {
 		return fmt.Errorf("artefacts written, but they do not form a table: %w", err)
 	}
 	return nil
+}
+
+// fold turns run artefacts into the single JSON file `make report` renders
+// from, and is deliberately a separate step from running them.
+//
+// The report must never touch a live system: everything it states has to come
+// from artefacts on disk, so a report can be regenerated months later from a
+// directory of files and say exactly what it said the first time.
+func fold(args []string) error {
+	fs := flag.NewFlagSet("fold", flag.ContinueOnError)
+	in := fs.String("in", "reports/runs", "artefact directory")
+	out := fs.String("out", "reports/runs/finding2.json", "rendered input for make report")
+	minRuns := fs.Int("min-runs", ablation.MinRuns, "minimum runs per configuration")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	arts, err := ablation.Load(*in)
+	if err != nil {
+		return err
+	}
+	payload := map[string]any{"runs_per_config": *minRuns}
+
+	rows, tableErr := ablation.Table(arts, *minRuns)
+	if tableErr != nil {
+		// Not a failure. "Finding 2 could not be built, and here is precisely
+		// why" is a legitimate and more useful output than a missing file, and
+		// the report renders it verbatim.
+		payload["rows"] = nil
+		payload["reason"] = tableErr.Error()
+	} else {
+		kind, err := ablation.KindOf(arts)
+		if err != nil {
+			return err
+		}
+		payload["rows"] = rows
+		payload["kind"] = string(kind)
+		payload["broker"] = arts[0].BrokerVersion
+		payload["exact_counts"] = allExact(arts)
+	}
+
+	blob, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(*out), 0o750); err != nil {
+		return err
+	}
+	if err := os.WriteFile(*out, append(blob, '\n'), 0o600); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "folded %d artefacts into %s\n", len(arts), *out)
+	return nil
+}
+
+func allExact(arts []ablation.Artefact) bool {
+	for _, a := range arts {
+		if !a.ExactCounts {
+			return false
+		}
+	}
+	return true
+}
+
+func parseModes(s string) []consumer.Mode {
+	var out []consumer.Mode
+	for _, part := range strings.Split(s, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, consumer.Mode(part))
+		}
+	}
+	return out
 }
 
 func envOr(key, fallback string) string {

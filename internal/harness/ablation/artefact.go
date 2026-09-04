@@ -49,6 +49,15 @@ type Artefact struct {
 	LagPeak       int64   `json:"lag_peak"`
 	DrainSeconds  float64 `json:"drain_seconds"`
 	InvariantHeld bool    `json:"invariant_held"`
+
+	// Effects is the raw number of postings the consumer wrote, before any
+	// deduplication reasoning.
+	Effects int64 `json:"effects"`
+	// ExactCounts records whether Applied/Lost/Duplicated are exact or net.
+	// Modes without an inbox cannot distinguish a loss from a compensating
+	// duplicate, so their figures are net; presenting those as exact would be
+	// the report claiming a precision the configuration cannot deliver.
+	ExactCounts bool `json:"exact_counts"`
 }
 
 // fixedKey is everything that must match across a table.
@@ -148,9 +157,59 @@ func (e *ErrNotAMeasurement) Error() string {
 		e.RunID, e.Broker)
 }
 
-// IsMeasurement reports whether an artefact came from a real broker.
+// IsMeasurement reports whether an artefact measured anything at all.
+//
+// A plumbing run against a single in-process broker does not; a simulated
+// multi-broker run does, though not the same thing as a real cluster.
 func (a Artefact) IsMeasurement() bool {
 	return !strings.HasPrefix(a.BrokerVersion, BrokerFake)
+}
+
+// Kind classifies what a run's numbers may be claimed to describe.
+type Kind string
+
+const (
+	// KindPlumbing: one in-process broker that cannot fail. Measures nothing.
+	KindPlumbing Kind = "plumbing"
+	// KindSimulated: several brokers on real sockets, killed and restarted,
+	// with the log surviving. A real ablation of delivery semantics under
+	// broker failover, on a cluster that does not replicate.
+	KindSimulated Kind = "simulated"
+	// KindReal: a real cluster. The only kind Finding 2 may be built from.
+	KindReal Kind = "real"
+)
+
+// Kind reports what this artefact is entitled to claim.
+func (a Artefact) Kind() Kind {
+	switch {
+	case strings.HasPrefix(a.BrokerVersion, BrokerFake):
+		return KindPlumbing
+	case strings.HasPrefix(a.BrokerVersion, BrokerSim):
+		return KindSimulated
+	default:
+		return KindReal
+	}
+}
+
+// KindOf returns the single kind shared by every artefact, or an error.
+//
+// Mixing kinds is refused rather than resolved to the weakest. A table with one
+// simulated row among real ones is not "mostly real": the rows would not be
+// comparable to each other, which is the one thing an ablation table has to be.
+func KindOf(artefacts []Artefact) (Kind, error) {
+	if len(artefacts) == 0 {
+		return "", &ErrMismatchedParameters{Detail: "no artefacts found"}
+	}
+	kind := artefacts[0].Kind()
+	for _, a := range artefacts[1:] {
+		if a.Kind() != kind {
+			return "", &ErrMismatchedParameters{
+				Detail: fmt.Sprintf("run %s is %s but run %s is %s; a table cannot mix them",
+					a.RunID, a.Kind(), artefacts[0].RunID, kind),
+			}
+		}
+	}
+	return kind, nil
 }
 
 // Row is one line of the Finding 2 table: the median of >= 3 runs, with the
@@ -168,6 +227,18 @@ type Row struct {
 	LagPeak       string `json:"lag_peak"`
 	DrainSeconds  string `json:"drain_seconds"`
 	InvariantHeld bool   `json:"invariant_held"`
+
+	// Numeric duplication bounds, so the narrative can be derived from the
+	// data instead of written alongside it. Prose that has to be kept in sync
+	// by hand goes stale the first time the experiment is re-run, and a report
+	// whose words contradict its own table is worse than one with no words.
+	DupMin int64 `json:"dup_min"`
+	DupMax int64 `json:"dup_max"`
+
+	// LatencyMeasured is false when the run recorded no per-record timings.
+	// The columns then render as "not measured" rather than as zero, which
+	// would read as "instantaneous".
+	LatencyMeasured bool `json:"latency_measured"`
 }
 
 // MinRuns is the minimum number of runs per configuration a table may be built
@@ -186,6 +257,9 @@ func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 		if !a.IsMeasurement() {
 			return nil, &ErrNotAMeasurement{RunID: a.RunID, Broker: a.BrokerVersion}
 		}
+	}
+	if _, err := KindOf(artefacts); err != nil {
+		return nil, err
 	}
 	key := artefacts[0].fixedKey()
 	for _, a := range artefacts[1:] {
@@ -223,19 +297,35 @@ func Table(artefacts []Artefact, minRuns int) ([]Row, error) {
 				held = false
 			}
 		}
+		dupMin, dupMax := runs[0].Duplicated, runs[0].Duplicated
+		latency := false
+		for _, r := range runs {
+			if r.Duplicated < dupMin {
+				dupMin = r.Duplicated
+			}
+			if r.Duplicated > dupMax {
+				dupMax = r.Duplicated
+			}
+			if r.P50 > 0 || r.P95 > 0 || r.P99 > 0 {
+				latency = true
+			}
+		}
 		rows = append(rows, Row{
-			Config:        string(c),
-			Runs:          len(runs),
-			Sent:          stat(runs, func(a Artefact) int64 { return a.Sent }),
-			Applied:       stat(runs, func(a Artefact) int64 { return a.Applied }),
-			Lost:          stat(runs, func(a Artefact) int64 { return a.Lost }),
-			Duplicated:    stat(runs, func(a Artefact) int64 { return a.Duplicated }),
-			P50:           statMicros(runs, func(a Artefact) int64 { return a.P50 }),
-			P95:           statMicros(runs, func(a Artefact) int64 { return a.P95 }),
-			P99:           statMicros(runs, func(a Artefact) int64 { return a.P99 }),
-			LagPeak:       stat(runs, func(a Artefact) int64 { return a.LagPeak }),
-			DrainSeconds:  statFloat(runs, func(a Artefact) float64 { return a.DrainSeconds }),
-			InvariantHeld: held,
+			Config:          string(c),
+			Runs:            len(runs),
+			DupMin:          dupMin,
+			DupMax:          dupMax,
+			LatencyMeasured: latency,
+			Sent:            stat(runs, func(a Artefact) int64 { return a.Sent }),
+			Applied:         stat(runs, func(a Artefact) int64 { return a.Applied }),
+			Lost:            stat(runs, func(a Artefact) int64 { return a.Lost }),
+			Duplicated:      stat(runs, func(a Artefact) int64 { return a.Duplicated }),
+			P50:             statMicros(runs, func(a Artefact) int64 { return a.P50 }),
+			P95:             statMicros(runs, func(a Artefact) int64 { return a.P95 }),
+			P99:             statMicros(runs, func(a Artefact) int64 { return a.P99 }),
+			LagPeak:         stat(runs, func(a Artefact) int64 { return a.LagPeak }),
+			DrainSeconds:    statFloat(runs, func(a Artefact) float64 { return a.DrainSeconds }),
+			InvariantHeld:   held,
 		})
 	}
 	return rows, nil

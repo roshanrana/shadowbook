@@ -71,7 +71,7 @@ seed_broker=${seed_broker:-localhost:19092}
 if (exec 3<>"/dev/tcp/${seed_broker%%:*}/${seed_broker##*:}") 2>/dev/null; then
   row "broker" "ok" "$seed_broker answering"
 else
-  row "broker" "MISSING" "no broker at $seed_broker -- run: make up-chaos"; ablate_ok=0
+  row "broker" "MISSING" "no broker at $seed_broker -- run: make up-chaos (or use: make ablate-sim, no Docker needed)"; ablate_ok=0
 fi
 
 echo

@@ -78,8 +78,18 @@ up-chaos: ## Three-broker profile for ablation runs.
 down: ## Tear everything down, volumes included.
 	docker compose --profile single --profile chaos down -v
 
-ablate: ## Ablation A-C (D at M6b). Artefacts to reports/runs/.
-	@$(GO) run ./cmd/harness ablate --out $(RUN_DIR) --runs 3
+ablate: ## Ablation A-C against a real cluster (D at M6b). Needs `make up-chaos`.
+	@$(GO) build -o bin/ledger ./cmd/ledger
+	@$(GO) run ./cmd/harness ablate --out $(RUN_DIR) --runs 3 \
+		--dsn "$(LEDGER_DSN)" --ledger bin/ledger --ledger-sha "$$(git rev-parse --short HEAD)"
+	@$(GO) run ./cmd/harness fold --in $(RUN_DIR) --out $(RUN_DIR)/finding2.json
+
+ablate-sim: ## Same ablation against an in-process multi-broker cluster. No Docker.
+	@$(GO) build -o bin/ledger ./cmd/ledger
+	@$(GO) run ./cmd/harness ablate --simulated --out $(RUN_DIR) --runs 3 \
+		--rate 300 --duration 40s \
+		--dsn "$(LEDGER_DSN)" --ledger bin/ledger --ledger-sha "$$(git rev-parse --short HEAD)"
+	@$(GO) run ./cmd/harness fold --in $(RUN_DIR) --out $(RUN_DIR)/finding2.json
 
 perf: ## NFR-1/NFR-2 smoke. Its own gate: a latency assertion inside `check` is flaky.
 	@SHADOWBOOK_LEDGER_DSN="$(LEDGER_DSN)" $(GO) test -tags=perf -count=1 -v -timeout 10m ./internal/ledger/perf/
@@ -119,4 +129,4 @@ gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
 	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
 
 .PHONY: help doctor check coverage perf security fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
-        coverage demo up up-chaos down ablate report proto
+        coverage demo up up-chaos down ablate ablate-sim report proto

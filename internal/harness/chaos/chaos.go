@@ -161,3 +161,31 @@ func Validate(schedule []Event) error {
 	}
 	return nil
 }
+
+// DefaultSpan is the wall-clock the DefaultSchedule was written for. Scale uses
+// it as the reference so a scaled schedule keeps the same shape.
+const DefaultSpan = 240 * time.Second
+
+// Scale returns the schedule compressed or stretched to fit a run of length d.
+//
+// The chaos schedule is written for a four-minute run, which makes a nine-run
+// sweep take most of an hour. Shorter runs need the same SHAPE at a smaller
+// scale -- kills at the same fraction of the run, same order, same number of
+// brokers down at once -- not a different schedule improvised per run.
+//
+// Every event keeps its position relative to the run, so a scaled schedule is
+// still a valid one; Validate should be re-run on the result regardless, since
+// rounding can collapse two events onto the same instant.
+func Scale(schedule []Event, d time.Duration) []Event {
+	if d <= 0 || len(schedule) == 0 {
+		return append([]Event(nil), schedule...)
+	}
+	factor := float64(d) / float64(DefaultSpan)
+	out := make([]Event, 0, len(schedule))
+	for _, ev := range schedule {
+		scaled := ev
+		scaled.At = time.Duration(float64(ev.At) * factor)
+		out = append(out, scaled)
+	}
+	return out
+}

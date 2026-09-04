@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kadm"
@@ -68,6 +72,38 @@ func EnsureTopic(ctx context.Context, seeds []string, topic string, partitions i
 		return fmt.Errorf("broker: create topic %s: %w", topic, resp.Err)
 	}
 	return nil
+}
+
+// GroupLag reports a consumer group's total lag without joining the group.
+//
+// Joining would be the obvious way to ask and is exactly wrong: a new member
+// triggers a rebalance and takes partitions away from the consumer being
+// measured, so the act of observing would change the thing observed.
+func GroupLag(ctx context.Context, seeds []string, group string) (int64, error) {
+	cl, err := kgo.NewClient(kgo.SeedBrokers(seeds...), kgo.ClientID("shadowbook-lag"))
+	if err != nil {
+		return 0, fmt.Errorf("broker: lag client: %w", err)
+	}
+	defer cl.Close()
+
+	lags, err := kadm.NewClient(cl).Lag(ctx, group)
+	if err != nil {
+		return 0, fmt.Errorf("broker: group lag: %w", err)
+	}
+	var total int64
+	for _, described := range lags {
+		if described.FetchErr != nil || described.DescribeErr != nil {
+			continue
+		}
+		for _, partitions := range described.Lag {
+			for _, l := range partitions {
+				if l.Lag > 0 {
+					total += l.Lag
+				}
+			}
+		}
+	}
+	return total, nil
 }
 
 // KafkaProducer publishes with acks=all.
@@ -146,6 +182,43 @@ type KafkaConsumer struct {
 	adm     *kadm.Client
 	group   string
 	timeout time.Duration
+
+	// dataLoss counts partitions the cluster reset out from under this
+	// consumer. Exposed so a run artefact can report cluster-caused loss as a
+	// number rather than leaving it to be inferred from a shortfall.
+	dataLoss atomic.Int64
+}
+
+// DataLossEvents is how many times the cluster dropped records this consumer
+// had not read.
+func (c *KafkaConsumer) DataLossEvents() int64 { return c.dataLoss.Load() }
+
+// isDataLoss reports whether the cluster lost records the client had not read.
+func isDataLoss(err error) bool {
+	var dl *kgo.ErrDataLoss
+	return errors.As(err, &dl)
+}
+
+// isRetriable reports whether franz-go will recover on its own.
+//
+// Kafka protocol errors carry their own retriability, and connection-level
+// failures are retriable by definition: a broker that went away is the very
+// condition being tested, not a reason to stop.
+func isRetriable(err error) bool {
+	var ke *kerr.Error
+	if errors.As(err, &ke) {
+		return ke.Retriable
+	}
+	return !errors.Is(err, kgo.ErrClientClosed) && isConnErr(err)
+}
+
+func isConnErr(err error) bool {
+	var ne net.Error
+	if errors.As(err, &ne) {
+		return true
+	}
+	return errors.Is(err, io.EOF) || errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE)
 }
 
 // NewKafkaConsumer joins the group.
@@ -196,11 +269,34 @@ func (c *KafkaConsumer) Poll(ctx context.Context, maxRecords int) ([]Record, err
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if errs := fetches.Errors(); len(errs) > 0 {
-		for _, e := range errs {
-			if errors.Is(e.Err, context.DeadlineExceeded) || errors.Is(e.Err, context.Canceled) {
-				continue
-			}
+	// Not every fetch error is fatal, and treating them all as fatal was a real
+	// defect: under a broker kill the ledger exited instead of riding it out.
+	//
+	// Three kinds, and only the third should stop anything:
+	//
+	//  - the poll deadline or the caller's cancellation: the normal quiet case;
+	//  - a retriable broker error or data loss: the cluster changed under us.
+	//    franz-go has already refreshed metadata and reset the partition, and
+	//    the right response is to note it and keep consuming. Exiting here is
+	//    the worst possible reaction for a ledger whose stated job is to
+	//    survive broker loss -- and it silently converts a recoverable backlog
+	//    into permanent loss, because a dead consumer applies nothing;
+	//  - anything else, which is a real fault.
+	//
+	// Data loss is counted rather than swallowed. It means the CLUSTER dropped
+	// records this consumer had not yet read, which is exactly the event the
+	// ablation is measuring, so it must be visible in the artefact rather than
+	// inferred from a gap in the totals.
+	for _, e := range fetches.Errors() {
+		switch {
+		case errors.Is(e.Err, context.DeadlineExceeded), errors.Is(e.Err, context.Canceled):
+			continue
+		case isDataLoss(e.Err):
+			c.dataLoss.Add(1)
+			continue
+		case isRetriable(e.Err):
+			continue
+		default:
 			return nil, fmt.Errorf("broker: fetch %s[%d]: %w", e.Topic, e.Partition, e.Err)
 		}
 	}

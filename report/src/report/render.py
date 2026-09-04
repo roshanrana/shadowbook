@@ -166,10 +166,16 @@ def build_context(
         "available in the environment this report was generated in. Run "
         "`make up-chaos && make ablate` on a machine with Docker to populate it."
     )
+    finding2_kind = "real"
+    finding2_broker = ""
+    finding2_exact = True
     if finding2_path is not None and finding2_path.exists():
         payload = json.loads(finding2_path.read_text(encoding="utf-8"))
         finding2 = payload.get("rows") or None
         finding2_runs = int(payload.get("runs_per_config", 0))
+        finding2_kind = str(payload.get("kind", "real"))
+        finding2_broker = str(payload.get("broker", ""))
+        finding2_exact = bool(payload.get("exact_counts", True))
         if not finding2:
             finding2_reason = str(payload.get("reason", finding2_reason))
 
@@ -185,7 +191,11 @@ def build_context(
                 "month ends, and a first-of-month falling on a Saturday) and W2 "
                 "2028-10-02 to 2028-10-13 (Columbus Day)"
             ),
-            "broker": "Redpanda (not exercised in this run)" if not finding2 else "Redpanda",
+            "broker": (
+                "Redpanda (not exercised in this run)"
+                if not finding2
+                else (finding2_broker or "Redpanda")
+            ),
             "go_version": _go_version(),
             "python_version": platform.python_version(),
             "postgres": "PostgreSQL 16",
@@ -199,6 +209,9 @@ def build_context(
         "finding2": finding2,
         "finding2_runs": finding2_runs,
         "finding2_reason": finding2_reason,
+        "finding2_kind": finding2_kind,
+        "finding2_broker": finding2_broker,
+        "finding2_exact": finding2_exact,
     }
 
 

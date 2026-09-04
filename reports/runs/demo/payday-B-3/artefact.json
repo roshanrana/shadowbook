@@ -1,0 +1,79 @@
+{
+  "run_id": "payday-B-3",
+  "config": "B",
+  "seed": 20260904,
+  "profile": "payday",
+  "rate_per_sec": 300,
+  "duration_sec": 40,
+  "schedule": [
+    {
+      "at": 10000000000,
+      "action": "kill",
+      "broker": "redpanda-1"
+    },
+    {
+      "at": 15000000000,
+      "action": "start",
+      "broker": "redpanda-1"
+    },
+    {
+      "at": 25000000000,
+      "action": "kill",
+      "broker": "redpanda-2"
+    },
+    {
+      "at": 30000000000,
+      "action": "start",
+      "broker": "redpanda-2"
+    }
+  ],
+  "ledger_sha": "5bb8ff5",
+  "broker_version": "sim:kfake-3-broker",
+  "executed_schedule": [
+    {
+      "event": {
+        "at": 10000000000,
+        "action": "kill",
+        "broker": "redpanda-1"
+      },
+      "executed_at": 10000170915
+    },
+    {
+      "event": {
+        "at": 15000000000,
+        "action": "start",
+        "broker": "redpanda-1"
+      },
+      "executed_at": 15000883193
+    },
+    {
+      "event": {
+        "at": 25000000000,
+        "action": "kill",
+        "broker": "redpanda-2"
+      },
+      "executed_at": 25000774354
+    },
+    {
+      "event": {
+        "at": 30000000000,
+        "action": "start",
+        "broker": "redpanda-2"
+      },
+      "executed_at": 30001147991
+    }
+  ],
+  "sent": 12000,
+  "applied": 12000,
+  "lost": 0,
+  "duplicated": 8990,
+  "in_flight_at_drain": 0,
+  "p50_micros": 0,
+  "p95_micros": 0,
+  "p99_micros": 0,
+  "lag_peak": 0,
+  "drain_seconds": 0.505535565,
+  "invariant_held": true,
+  "effects": 20990,
+  "exact_counts": false
+}

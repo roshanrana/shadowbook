@@ -83,8 +83,8 @@ Scheduling source of truth. `STATE.md` mirrors only the current wave.
 | T-046 | Ablation runner and run artefacts | M5 | 11 | T-044, T-045, T-024 | L | done |
 | T-047 | Loss and duplication measurement, drain logic | M6 | 14 | T-046 | M | done |
 | T-048 | `make ablate` for A–C, three runs each | M6 | 15 | T-047 | M | done |
-| T-049 | Finding 2 rendering with the fixed-parameter guard | M6 | 16 | T-048 | M | not started |
-| T-050 | `make report` determinism test | M6 | 17 | T-049, T-040 | S | not started |
+| T-049 | Finding 2 rendering with the fixed-parameter guard | M6 | 16 | T-048 | M | done |
+| T-050 | `make report` determinism test | M6 | 17 | T-049, T-040 | S | done |
 | T-051 | Configuration D against Redpanda, with go/no-go | M6b | 18 | T-049 | L | not started |
 | T-052 | Security sweep: govulncheck, pip-audit, secrets scan | M7 | 18 | T-050 | M | done |
 | T-053 | Coverage enforcement to NFR-7 targets | M7 | 18 | T-050 | M | done |

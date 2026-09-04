@@ -191,3 +191,35 @@ func contains(haystack, needle string) bool {
 		return false
 	})()
 }
+
+func TestScaleKeepsTheShapeOfTheSchedule(t *testing.T) {
+	full := DefaultSchedule()
+	half := Scale(full, DefaultSpan/2)
+
+	if len(half) != len(full) {
+		t.Fatalf("scaled schedule has %d events, want %d", len(half), len(full))
+	}
+	for i := range full {
+		if half[i].Action != full[i].Action || half[i].Broker != full[i].Broker {
+			t.Fatalf("event %d changed identity: %+v vs %+v", i, half[i], full[i])
+		}
+		if want := full[i].At / 2; half[i].At != want {
+			t.Fatalf("event %d at %s, want %s", i, half[i].At, want)
+		}
+	}
+	// A scaled schedule must still be a legal one, or a short run would be
+	// executing something Validate would have rejected at full length.
+	if err := Validate(half); err != nil {
+		t.Fatalf("scaled schedule is invalid: %v", err)
+	}
+}
+
+func TestScaleIsIdentityAtTheReferenceSpan(t *testing.T) {
+	full := DefaultSchedule()
+	same := Scale(full, DefaultSpan)
+	for i := range full {
+		if same[i].At != full[i].At {
+			t.Fatalf("event %d moved to %s from %s at the reference span", i, same[i].At, full[i].At)
+		}
+	}
+}

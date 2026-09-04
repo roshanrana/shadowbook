@@ -272,14 +272,30 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID string) (Art
 	if err != nil {
 		return art, err
 	}
+
+	// Wait for the chaos schedule to FINISH rather than cancelling it.
+	//
+	// Cancelling here was a defect that corrupted the whole sweep. The schedule
+	// ends with restarts; cancelling before they ran left brokers down, and the
+	// SimCluster outlives a single run, so every later run started with a
+	// smaller cluster than the one before it. The result was a loss column that
+	// drifted with position in the sweep and did not correlate with the
+	// delivery mode at all -- which is what gave it away.
+	select {
+	case art.Executed = <-chaosDone:
+	case <-time.After(2 * time.Minute):
+		r.logf("run %s: chaos schedule did not finish", runID)
+	}
 	cancelLoad()
-	art.Executed = <-chaosDone
 
 	drainStart := r.now()
-	if err := r.waitForDrain(ctx, st, sent); err != nil {
+	if err := r.waitForDrain(ctx, st, sent, r.Cluster.Seeds(), group); err != nil {
 		r.logf("run %s: drain did not settle: %v", runID, err)
 	}
 	art.DrainSeconds = r.now().Sub(drainStart).Seconds()
+	if lag, err := broker.GroupLag(ctx, r.Cluster.Seeds(), group); err == nil {
+		art.InFlight = lag
+	}
 
 	if err := measure(ctx, st, &art); err != nil {
 		return art, err
@@ -361,15 +377,24 @@ func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uui
 	return sent, nil
 }
 
-// waitForDrain blocks until the applied count stops moving.
+// waitForDrain blocks until the consumer has finished, or has demonstrably
+// stopped.
 //
-// "Stops moving" rather than "reaches sent": under modes that lose records it
-// never reaches sent, and waiting for equality would hang precisely on the
-// configurations the experiment is most interested in.
-func (r *Runner) waitForDrain(ctx context.Context, st *store.Store, sent int64) error {
+// The first version watched only the applied count and called the run drained
+// after three quiet seconds. That is wrong while a broker is down: the consumer
+// is reconnecting and refetching metadata, applies nothing for several seconds,
+// and the backlog it is about to process gets recorded as permanent loss. The
+// symptom was a loss column that did not correlate with the delivery mode --
+// the same configuration losing everything in one run and nothing in the next.
+//
+// Group lag is the honest signal. Records still sitting unread on the broker
+// are not lost, whatever the consumer is doing at this instant, so the run is
+// only over when lag reaches zero or the consumer stops making progress for
+// long enough that it is not coming back.
+func (r *Runner) waitForDrain(ctx context.Context, st *store.Store, sent int64, seeds []string, group string) error {
 	const (
-		quiet = 3 * time.Second
-		limit = 2 * time.Minute
+		quiet = 20 * time.Second // must exceed broker failover, or a stall reads as loss
+		limit = 3 * time.Minute
 	)
 	deadline := r.now().Add(limit)
 	var last int64
@@ -379,7 +404,7 @@ func (r *Runner) waitForDrain(ctx context.Context, st *store.Store, sent int64) 
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(500 * time.Millisecond):
 		}
 		n, err := appliedCount(ctx, st)
 		if err != nil {
@@ -387,13 +412,19 @@ func (r *Runner) waitForDrain(ctx context.Context, st *store.Store, sent int64) 
 		}
 		if n != last {
 			last, lastChange = n, r.now()
-			continue
 		}
-		if r.now().Sub(lastChange) >= quiet {
+
+		// Nothing left on the broker: the consumer is genuinely finished, and
+		// whatever did not land was dropped by the delivery mode, which is the
+		// measurement.
+		if lag, err := broker.GroupLag(ctx, seeds, group); err == nil && lag == 0 && n > 0 {
 			return nil
 		}
 		if n >= sent {
 			return nil
+		}
+		if r.now().Sub(lastChange) >= quiet {
+			return fmt.Errorf("consumer applied nothing for %s with %d of %d applied", quiet, n, sent)
 		}
 	}
 	return fmt.Errorf("still moving after %s", limit)
@@ -407,13 +438,23 @@ func appliedCount(ctx context.Context, st *store.Store) (int64, error) {
 }
 
 // measure reads the run's outcome out of the ledger database.
+//
+// How loss and duplication can be counted depends on the configuration, and
+// that difference is itself a result rather than an inconvenience:
+//
+//   - Modes C and D claim each message id in an inbox row, so the number of
+//     DISTINCT movements applied is a fact the database holds. Loss and
+//     duplication are then exact, and duplication should be zero.
+//   - Modes A and B keep no inbox and mint a fresh posting id per delivery, so
+//     nothing in the ledger records which movement an effect came from. The
+//     counts here are therefore NET: a run that lost 100 movements and applied
+//     100 others twice is indistinguishable from a clean one. That is not a
+//     gap in the harness -- it is the operational consequence of running
+//     without an inbox, and the artefact records it as such rather than
+//     presenting a net figure as an exact one.
 func measure(ctx context.Context, st *store.Store, art *Artefact) error {
-	// Applied counts DISTINCT movements that produced an effect. Mode B
-	// duplicates by writing a second posting for the same message, so counting
-	// postings would make a duplicate look like an extra delivery.
-	var applied, postings int64
-	if err := st.Pool.QueryRow(ctx,
-		`SELECT count(*) FROM inbox`).Scan(&applied); err != nil {
+	var inbox, postings int64
+	if err := st.Pool.QueryRow(ctx, `SELECT count(*) FROM inbox`).Scan(&inbox); err != nil {
 		return fmt.Errorf("ablation: count inbox: %w", err)
 	}
 	if err := st.Pool.QueryRow(ctx,
@@ -421,15 +462,20 @@ func measure(ctx context.Context, st *store.Store, art *Artefact) error {
 		return fmt.Errorf("ablation: count postings: %w", err)
 	}
 
-	// Modes A and B keep no inbox, so distinctness cannot be read from it;
-	// there, postings ARE the applied count and duplicates are invisible to the
-	// ledger by construction -- which is the property being measured.
-	if applied == 0 {
-		applied = postings
+	switch art.Config {
+	case consumer.InboxDedup, consumer.Transactional:
+		art.ExactCounts = true
+		art.Applied = inbox
+		art.Duplicated = maxInt64(0, postings-inbox)
+		art.Lost = maxInt64(0, art.Sent-inbox)
+	default:
+		// Every effect is a posting and no two can be tied to one movement.
+		art.ExactCounts = false
+		art.Applied = minInt64(postings, art.Sent)
+		art.Duplicated = maxInt64(0, postings-art.Sent)
+		art.Lost = maxInt64(0, art.Sent-postings)
 	}
-	art.Applied = applied
-	art.Duplicated = maxInt64(0, postings-applied)
-	art.Lost = maxInt64(0, art.Sent-applied)
+	art.Effects = postings
 
 	inv, err := store.GlobalInvariant(ctx, st.Pool)
 	if err != nil {
@@ -442,6 +488,13 @@ func measure(ctx context.Context, st *store.Store, art *Artefact) error {
 		}
 	}
 	return nil
+}
+
+func minInt64(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func maxInt64(a, b int64) int64 {

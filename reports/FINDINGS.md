@@ -5,10 +5,10 @@
 
 | | |
 |---|---|
-| Git SHA | `c12dfa285f917839d055522f44adb5e5f75cf50c` |
+| Git SHA | `5bb8ff5f085d28e881d8086f168ac57ebaaad115` |
 | Seed | `20260903` |
 | Windows | W1, W2 |
-| Broker | Redpanda (not exercised in this run) |
+| Broker | sim:kfake-3-broker |
 | Go / Python | go1.24.7 / 3.13.13 |
 | PostgreSQL | PostgreSQL 16 |
 | Machine | Linux x86_64 |
@@ -114,20 +114,62 @@ reconciliation can do; reporting only the isolated number would overstate it.
 
 ## Finding 2 — Delivery-semantics ablation under broker loss
 
-**Not run.** The three-broker chaos profile requires a Docker daemon, which was not available in the environment this report was generated in. Run `make up-chaos && make ablate` on a machine with Docker to populate it.
+> **Simulated cluster, not Redpanda.** These runs used `sim:kfake-3-broker`:
+> several brokers in one process, each on its own TCP socket, killed and
+> restarted on the chaos schedule, with the group coordinator moving on each
+> kill so consumers genuinely rebalance. The delivery-mode comparison below is
+> therefore real — the modes were exercised over the Kafka wire protocol,
+> through actual rebalances, under identical chaos.
+>
+> What it is **not**: there is no replication, no ISR to shrink, no unclean
+> leader election and no disk. Absolute latency and throughput here describe one
+> process on one machine and should not be quoted. Treat the **ordering and the
+> presence or absence of duplicates** as the result, not the magnitudes.
+Median of 3 runs per configuration, min–max in brackets.
+Counts for configurations A and B are **net, not exact**. Neither keeps an
+inbox, and both mint a fresh posting id per delivery, so nothing in the ledger
+records which movement an effect came from: a run that lost 100 movements and
+applied 100 others twice is indistinguishable from a clean one. That is not a
+limitation of the harness but the operational consequence of running without an
+inbox — without one, the ledger cannot answer "was this applied twice?" at all.
 
-The mechanism each configuration relies on is nonetheless demonstrated
-deterministically by the consumer test suite, without a broker:
+| Config | Runs | Sent | Applied | Lost | Duplicated | Latency p50/p95/p99 | Drain (s) | Invariant held |
+|---|---|---|---|---|---|---|---|---|
+| A | 3 | 12000 | 12000 | 0 | 4765 [0–9000] | not measured | 0.5 [0.5–0.5] | Y |
+| B | 3 | 12000 | 12000 | 0 | 7479 [0–8990] | not measured | 0.5 | Y |
+| C | 3 | 12000 | 12000 | 0 | 0 | not measured | 0.5 [0.5–0.5] | Y |
+End-to-end latency is **not measured** in this run. The harness records what was
+applied, not when, so per-record timings would have to be inferred from commit
+timestamps -- and an inferred number in a latency column is worse than an empty
+one. It is left empty rather than filled with a zero that would read as
+"instantaneous".
 
-| Config | Design | Under redelivery | Test |
-|---|---|---|---|
-| A | commit offsets before applying | batch lost outright | `TestModeALosesRecordsOnFailureAfterCommit` |
-| B | apply, then commit; no dedup | applied twice (4 entries for 2 movements) | `TestRedeliveryDuplicatesInBButNotInC/B` |
-| C | apply + claim `inbox` id in one transaction | suppressed by `inbox_pkey` (2 entries) | `TestRedeliveryDuplicatesInBButNotInC/C` |
-| D | as C, offsets committed transactionally | suppressed (2 entries) | `TestRedeliveryDuplicatesInBButNotInC/D` |
+**What the columns say.** Every statement here is derived from the table above
+rather than written beside it, so it cannot drift from the data on a re-run.
 
-Loss, duplication and latency **numbers** require the three-broker chaos profile
-and are not claimed here.
+- **A** duplicated in some runs and not others (0–9000),
+  so its safety depends on timing rather than on the configuration alone.
+- **B** duplicated in some runs and not others (0–8990),
+  so its safety depends on timing rather than on the configuration alone.
+- **C** duplicated nothing in any of its 3 runs.
+
+The mechanism behind those rows does not vary between runs. Configuration C
+cannot duplicate: a redelivered message collides on `inbox_pkey` and the whole
+transaction rolls back, so suppression is a database constraint rather than a
+race that usually goes the right way. B has no such constraint, and every
+redelivery it sees becomes a second effect.
+
+A is the row worth reading twice. At-most-once is supposed to lose rather than
+duplicate, and it commits offsets *before* applying to guarantee that -- but
+that guarantee lasts only as long as the commit itself survives. When a
+coordinator failover loses the commit, the records come back and are applied
+again under fresh posting ids. "At-most-once" is therefore not a property of the
+configuration on its own; it holds while offset commits are durable, and a
+broker failure is precisely the event that makes them not durable.
+
+The zero-sum invariant held in every run of every configuration. Duplicates
+change what the ledger says; they never made it disagree with itself.
+
 
 ## Methods
 
@@ -179,7 +221,7 @@ and are not claimed here.
 ## Reproduce
 
 ```
-git checkout c12dfa285f917839d055522f44adb5e5f75cf50c
+git checkout 5bb8ff5f085d28e881d8086f168ac57ebaaad115
 cp .env.example .env
 make up
 make demo          # both windows, Finding 1

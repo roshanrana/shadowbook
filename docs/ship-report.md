@@ -62,7 +62,7 @@ Named plainly, because "implemented" and "exercised" are different claims.
 | `internal/ledger/outbox` | relay, failure mid-batch, drain on shutdown | real produce with `acks=all` |
 | `internal/harness/chaos` | scheduler, validation, failure handling | real `docker kill` |
 | `internal/harness/ablation` | artefact schema, fixed-parameter guard, table folding | a real run |
-| `cmd/harness ablate` | preflight, orchestration, artefacts (T-048) | **needs a real cluster**: verified end to end against kfake, never against Redpanda |
+| `cmd/harness ablate` | preflight, orchestration, artefacts, fold (T-048/T-049) | **simulated cluster only**: A/B/C measured via `make ablate-sim`; never run against Redpanda |
 
 `cmd/harness ablate` fails with a message saying exactly this rather than
 producing numbers measured against something that was not the experiment.

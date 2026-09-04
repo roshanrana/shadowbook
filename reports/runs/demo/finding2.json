@@ -1,0 +1,59 @@
+{
+  "broker": "sim:kfake-3-broker",
+  "exact_counts": false,
+  "kind": "simulated",
+  "rows": [
+    {
+      "config": "A",
+      "runs": 3,
+      "sent": "12000",
+      "applied": "12000",
+      "lost": "0",
+      "duplicated": "4765 [0–9000]",
+      "p50": "0s",
+      "p95": "0s",
+      "p99": "0s",
+      "lag_peak": "0",
+      "drain_seconds": "0.5 [0.5–0.5]",
+      "invariant_held": true,
+      "dup_min": 0,
+      "dup_max": 9000,
+      "latency_measured": false
+    },
+    {
+      "config": "B",
+      "runs": 3,
+      "sent": "12000",
+      "applied": "12000",
+      "lost": "0",
+      "duplicated": "7479 [0–8990]",
+      "p50": "0s",
+      "p95": "0s",
+      "p99": "0s",
+      "lag_peak": "0",
+      "drain_seconds": "0.5",
+      "invariant_held": true,
+      "dup_min": 0,
+      "dup_max": 8990,
+      "latency_measured": false
+    },
+    {
+      "config": "C",
+      "runs": 3,
+      "sent": "12000",
+      "applied": "12000",
+      "lost": "0",
+      "duplicated": "0",
+      "p50": "0s",
+      "p95": "0s",
+      "p99": "0s",
+      "lag_peak": "0",
+      "drain_seconds": "0.5 [0.5–0.5]",
+      "invariant_held": true,
+      "dup_min": 0,
+      "dup_max": 0,
+      "latency_measured": false
+    }
+  ],
+  "runs_per_config": 3
+}
