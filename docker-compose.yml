@@ -85,8 +85,14 @@ services:
       - --reserve-memory=0M
       - --node-id=1
       - --check=false
-      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
-      - --advertise-kafka-addr=PLAINTEXT://redpanda-1:9092
+      # Two listeners, because the brokers are reached from two places.
+      # INTERNAL is how the brokers and the container network reach each
+      # other; EXTERNAL is how the harness on the HOST reaches them. A
+      # single listener advertising redpanda-1:9092 bootstraps fine from
+      # the host and then hands back a hostname the host cannot resolve,
+      # so every produce fails after a successful connection.
+      - --kafka-addr=INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
+      - --advertise-kafka-addr=INTERNAL://redpanda-1:9092,EXTERNAL://localhost:19092
       - --rpc-addr=0.0.0.0:33145
       - --advertise-rpc-addr=redpanda-1:33145
       - --set=redpanda.default_topic_replications=3
@@ -94,7 +100,7 @@ services:
       - --set=redpanda.unclean_leader_election_enabled=false
       - --set=redpanda.enable_transactions=true
       - --set=redpanda.enable_idempotence=true
-    ports: ["19092:9092"]
+    ports: ["19092:19092"]
 
   redpanda-2:
     <<: *redpanda-common
@@ -113,8 +119,14 @@ services:
       - --reserve-memory=0M
       - --node-id=2
       - --check=false
-      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
-      - --advertise-kafka-addr=PLAINTEXT://redpanda-2:9092
+      # Two listeners, because the brokers are reached from two places.
+      # INTERNAL is how the brokers and the container network reach each
+      # other; EXTERNAL is how the harness on the HOST reaches them. A
+      # single listener advertising redpanda-2:9092 bootstraps fine from
+      # the host and then hands back a hostname the host cannot resolve,
+      # so every produce fails after a successful connection.
+      - --kafka-addr=INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      - --advertise-kafka-addr=INTERNAL://redpanda-2:9092,EXTERNAL://localhost:29092
       - --rpc-addr=0.0.0.0:33145
       - --advertise-rpc-addr=redpanda-2:33145
       - --seeds=redpanda-1:33145
@@ -123,7 +135,7 @@ services:
       - --set=redpanda.unclean_leader_election_enabled=false
       - --set=redpanda.enable_transactions=true
       - --set=redpanda.enable_idempotence=true
-    ports: ["29092:9092"]
+    ports: ["29092:29092"]
     depends_on: [redpanda-1]
 
   redpanda-3:
@@ -143,8 +155,14 @@ services:
       - --reserve-memory=0M
       - --node-id=3
       - --check=false
-      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
-      - --advertise-kafka-addr=PLAINTEXT://redpanda-3:9092
+      # Two listeners, because the brokers are reached from two places.
+      # INTERNAL is how the brokers and the container network reach each
+      # other; EXTERNAL is how the harness on the HOST reaches them. A
+      # single listener advertising redpanda-3:9092 bootstraps fine from
+      # the host and then hands back a hostname the host cannot resolve,
+      # so every produce fails after a successful connection.
+      - --kafka-addr=INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:39092
+      - --advertise-kafka-addr=INTERNAL://redpanda-3:9092,EXTERNAL://localhost:39092
       - --rpc-addr=0.0.0.0:33145
       - --advertise-rpc-addr=redpanda-3:33145
       - --seeds=redpanda-1:33145
@@ -153,7 +171,7 @@ services:
       - --set=redpanda.unclean_leader_election_enabled=false
       - --set=redpanda.enable_transactions=true
       - --set=redpanda.enable_idempotence=true
-    ports: ["39092:9092"]
+    ports: ["39092:39092"]
     depends_on: [redpanda-1]
 
   prometheus:
