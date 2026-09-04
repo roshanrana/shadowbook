@@ -1,0 +1,811 @@
+<title>SHADOWBOOK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600;700&display=swap">
+
+<style>
+  :root {
+    --paper:      #eef1f5;
+    --surface:    #ffffff;
+    --surface-2:  #e5eaf1;
+    --ink:        #101820;
+    --ink-soft:   #4a5764;
+    --ink-faint:  #6d7b8a;
+    --rule:       #c6ced9;
+    --rule-soft:  #dbe1e9;
+    --divergence: #a32e22;
+    --twin:       #14606e;
+    --flag:       #8c6009;
+
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --sans:  "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --measure: 67ch;
+    --gutter: clamp(1.15rem, 4vw, 2.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0c1118;
+      --surface:    #141b24;
+      --surface-2:  #1b232d;
+      --ink:        #dce3ec;
+      --ink-soft:   #a3b0bf;
+      --ink-faint:  #7d8b9b;
+      --rule:       #2b3643;
+      --rule-soft:  #202a35;
+      --divergence: #e2836f;
+      --twin:       #5cb8c5;
+      --flag:       #d3a143;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0c1118;
+    --surface:    #141b24;
+    --surface-2:  #1b232d;
+    --ink:        #dce3ec;
+    --ink-soft:   #a3b0bf;
+    --ink-faint:  #7d8b9b;
+    --rule:       #2b3643;
+    --rule-soft:  #202a35;
+    --divergence: #e2836f;
+    --twin:       #5cb8c5;
+    --flag:       #d3a143;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 74rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 6vw, 4.5rem) var(--gutter) 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(3rem, 7vw, 5rem);
+  }
+
+  .col { max-width: var(--measure); }
+
+  p { margin: 0 0 1em; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: currentColor; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--twin);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 600; }
+  code, .mono { font-family: var(--mono); font-size: 0.9em; }
+  code { color: var(--ink-soft); }
+
+  .label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 1.6rem; }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(2.6rem, 8vw, 4.4rem);
+    line-height: 0.98;
+    letter-spacing: -0.022em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(1.15rem, 2.6vw, 1.42rem);
+    line-height: 1.45;
+    color: var(--ink-soft);
+    max-width: 40ch;
+    margin: 0;
+    text-wrap: pretty;
+  }
+
+  .colophon {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.6rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+  }
+  .colophon b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.6rem, 4vw, 2.15rem);
+    line-height: 1.14;
+    letter-spacing: -0.014em;
+    margin: 0 0 0.55rem;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.02rem;
+    line-height: 1.35;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.003em;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.9rem; }
+  .sec-head { display: flex; flex-direction: column; gap: 0.5rem; }
+  .sec-head .label { order: -1; }
+
+  /* ---------- annotated blocks: the left rule carries meaning ---------- */
+
+  .note {
+    border-left: 3px solid var(--rule);
+    padding: 0.15rem 0 0.15rem 1.15rem;
+  }
+  .note--break { border-left-color: var(--divergence); }
+  .note--held  { border-left-color: var(--twin); }
+  .note h3     { color: var(--ink); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.4rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .legend i {
+    width: 0.72rem; height: 0.72rem; border-radius: 50%;
+    display: inline-block; flex: none;
+  }
+  .swatch-twin { background: var(--twin); }
+  .swatch-flag { background: transparent; border: 2px solid var(--flag); }
+
+  /* ---------- stat row ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .stat { background: var(--surface); padding: 1rem 1.15rem 1.05rem; }
+  .stat dt {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.4rem;
+  }
+  .stat dd {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 1.72rem;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat dd small {
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: 0.8rem;
+    letter-spacing: 0;
+    color: var(--ink-faint);
+    display: block;
+    margin-top: 0.3rem;
+    line-height: 1.35;
+  }
+
+  /* ---------- the time-to-discovery chart ---------- */
+
+  .chart {
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    padding: 1.4rem clamp(1rem, 3vw, 1.7rem) 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .chart-rows { display: flex; flex-direction: column; }
+
+  .qrow {
+    display: grid;
+    grid-template-columns: 2.6rem minmax(4rem, 1fr) 1.9rem minmax(0, 13.5rem);
+    grid-template-areas: "id track day name";
+    align-items: center;
+    column-gap: 0.8rem;
+    row-gap: 0.1rem;
+    padding: 0.19rem 0;
+  }
+  @media (max-width: 54rem) {
+    .qrow {
+      grid-template-columns: 2.6rem minmax(0, 1fr) 1.9rem;
+      grid-template-areas: "id track day" ". name name";
+      padding: 0.42rem 0;
+    }
+  }
+
+  .qrow-id {
+    grid-area: id;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .qrow-day {
+    grid-area: day;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    font-weight: 500;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .qrow-name {
+    grid-area: name;
+    font-size: 0.79rem;
+    line-height: 1.3;
+    color: var(--ink-faint);
+  }
+  .qrow-track {
+    grid-area: track;
+    position: relative;
+    height: 1.2rem;
+    margin-inline: 0.45rem;
+  }
+  .qrow-track::before {
+    content: "";
+    position: absolute;
+    inset-inline: -0.45rem;
+    top: 50%;
+    height: 1px;
+    background: var(--rule-soft);
+  }
+  .dot {
+    position: absolute;
+    top: 50%;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--flag);
+    border: 2px solid var(--flag);
+  }
+  .dot--flag { background: var(--surface); }
+  .dot--twin { background: var(--twin); border-color: var(--twin); }
+
+  .qrow--axis { padding-top: 0.15rem; align-items: start; }
+  .axis {
+    grid-area: track;
+    position: relative;
+    height: 1.15rem;
+    margin-inline: 0.45rem;
+    border-top: 1px solid var(--rule);
+  }
+  .tick {
+    position: absolute;
+    top: 0.24rem;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .axis-caption {
+    grid-area: name;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    align-self: start;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroller { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td {
+    text-align: left;
+    padding: 0.62rem 0.9rem;
+    border-bottom: 1px solid var(--rule-soft);
+    white-space: nowrap;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--rule);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .range { color: var(--ink-faint); font-size: 0.86em; }
+  .cfg { font-weight: 600; }
+  .cfg em { font-style: normal; font-weight: 400; color: var(--ink-faint); }
+  .bad  { color: var(--divergence); font-weight: 600; }
+  .good { color: var(--twin); font-weight: 600; }
+  td.wrapme, th.wrapme { white-space: normal; min-width: 15rem; }
+
+  /* ---------- defect ledger ---------- */
+
+  .ledger { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  @media (min-width: 46rem) { .ledger { grid-template-columns: 1fr 1fr; } }
+  .entry {
+    background: var(--surface);
+    padding: 1.05rem 1.2rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .entry .label { color: var(--divergence); }
+  .entry p { font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+  .entry h3 { font-size: 0.97rem; }
+
+  /* ---------- pull quote ---------- */
+
+  .pull {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(1.2rem, 3.1vw, 1.62rem);
+    line-height: 1.36;
+    letter-spacing: -0.011em;
+    max-width: 30ch;
+    margin: 0;
+    text-wrap: pretty;
+  }
+  .pull span { color: var(--divergence); }
+
+  /* ---------- caveats ---------- */
+
+  .caveats { display: flex; flex-direction: column; gap: 1.05rem; max-width: var(--measure); }
+  .caveat { display: grid; grid-template-columns: auto 1fr; gap: 0.85rem; align-items: baseline; }
+  .caveat::before {
+    content: "";
+    width: 0.55rem; height: 0.55rem;
+    border: 1.5px solid var(--divergence);
+    transform: rotate(45deg);
+    align-self: center;
+  }
+  .caveat p { font-size: 0.94rem; color: var(--ink-soft); margin: 0; }
+  .caveat b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- repro ---------- */
+
+  .repro {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    padding: 1.05rem 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.85;
+    overflow-x: auto;
+    color: var(--ink-soft);
+    white-space: pre;
+  }
+  .repro b { color: var(--ink); font-weight: 500; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.3rem;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    max-width: var(--measure);
+  }
+
+  hr.sep { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <p class="label" style="margin:0 0 0.9rem">Digital-twin harness · core-ledger migration</p>
+      <h1>SHADOWBOOK</h1>
+    </div>
+    <p class="standfirst">
+      Run a new double-entry ledger as a read-only shadow of a legacy core, reconcile the
+      two continuously, and measure two things nobody usually measures.
+    </p>
+    <div class="colophon">
+      <span><b>seed</b> 20260903</span>
+      <span><b>broker</b> redpanda v24.3.6</span>
+      <span><b>runs</b> 3 per configuration</span>
+      <span><b>report</b> generated, never hand-edited</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">The problem</p>
+      <h2>Core migrations fail in the last two percent</h2>
+    </div>
+    <div class="col">
+      <p>
+        Not on the happy path. They fail in the residue of reconciliation breaks, and those
+        are almost always <em>undocumented behaviour in the incumbent</em> — a rounding rule,
+        a cut-off boundary, a fee waiver nobody wrote down, a holiday the old system does
+        not observe.
+      </p>
+      <p>
+        You cannot test against behaviour nobody has written down. You can only run both
+        systems side by side and watch where they disagree. So: a shadow ledger, a legacy
+        simulator carrying twelve deliberate divergences, a reconciler working at three
+        grains — and an honest measurement of how long each divergence took to surface.
+      </p>
+    </div>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">Finding 1</p>
+      <h2>Time-to-discovery, and the gap between detecting and explaining</h2>
+      <p style="margin:0.3rem 0 0">
+        Each quirk is measured <strong>in isolation</strong> against a control run with every
+        quirk disabled — the only way “business days until this surfaced” means what it says.
+      </p>
+    </div>
+
+    <dl class="stats">
+      <div class="stat">
+        <dt>Detected</dt>
+        <dd>12 / 12<small>every seeded behaviour surfaced</small></dd>
+      </div>
+      <div class="stat">
+        <dt>Isolated</dt>
+        <dd>3 / 12<small>break signature naming one cause</small></dd>
+      </div>
+      <div class="stat">
+        <dt>Median</dt>
+        <dd>2.5<small>business days to first detection</small></dd>
+      </div>
+      <div class="stat">
+        <dt>Range</dt>
+        <dd>1–26<small>days — spread set by cadence</small></dd>
+      </div>
+    </dl>
+
+    <div class="chart">
+      <div class="chart-rows">
+        <div class="qrow"><span class="qrow-id">Q1</span><span class="qrow-track"><span class="dot dot--flag" style="left:4%"></span></span><span class="qrow-day">2</span><span class="qrow-name">interest rounds half-up</span></div>
+        <div class="qrow"><span class="qrow-id">Q2</span><span class="qrow-track"><span class="dot dot--flag" style="left:0%"></span></span><span class="qrow-day">1</span><span class="qrow-name">cut-off treated as inclusive</span></div>
+        <div class="qrow"><span class="qrow-id">Q3</span><span class="qrow-track"><span class="dot dot--twin" style="left:8%"></span></span><span class="qrow-day">3</span><span class="qrow-name">ACT/360 on one product</span></div>
+        <div class="qrow"><span class="qrow-id">Q4</span><span class="qrow-track"><span class="dot dot--flag" style="left:4%"></span></span><span class="qrow-day">2</span><span class="qrow-name">grandfathered fee waiver</span></div>
+        <div class="qrow"><span class="qrow-id">Q5</span><span class="qrow-track"><span class="dot dot--flag" style="left:20%"></span></span><span class="qrow-day">6</span><span class="qrow-name">Columbus Day is a business day</span></div>
+        <div class="qrow"><span class="qrow-id">Q6</span><span class="qrow-track"><span class="dot dot--twin" style="left:8%"></span></span><span class="qrow-day">3</span><span class="qrow-name">leap-day accrual on ACT/365</span></div>
+        <div class="qrow"><span class="qrow-id">Q7</span><span class="qrow-track"><span class="dot dot--flag" style="left:96%"></span></span><span class="qrow-day">25</span><span class="qrow-name">fee on ledger, not available</span></div>
+        <div class="qrow"><span class="qrow-id">Q8</span><span class="qrow-track"><span class="dot dot--twin" style="left:12%"></span></span><span class="qrow-day">4</span><span class="qrow-name">hold expires at midnight N+3</span></div>
+        <div class="qrow"><span class="qrow-id">Q9</span><span class="qrow-track"><span class="dot dot--flag" style="left:0%"></span></span><span class="qrow-day">1</span><span class="qrow-name">reversal deletes the original</span></div>
+        <div class="qrow"><span class="qrow-id">Q10</span><span class="qrow-track"><span class="dot dot--flag" style="left:0%"></span></span><span class="qrow-day">1</span><span class="qrow-name">JPY stored with two decimals</span></div>
+        <div class="qrow"><span class="qrow-id">Q11</span><span class="qrow-track"><span class="dot dot--flag" style="left:0%"></span></span><span class="qrow-day">1</span><span class="qrow-name">60-second duplicate suppression</span></div>
+        <div class="qrow"><span class="qrow-id">Q12</span><span class="qrow-track"><span class="dot dot--flag" style="left:100%"></span></span><span class="qrow-day">26</span><span class="qrow-name">interest on first business day</span></div>
+        <div class="qrow qrow--axis">
+          <span class="axis">
+            <span class="tick" style="left:0%">1</span>
+            <span class="tick" style="left:16%">5</span>
+            <span class="tick" style="left:36%">10</span>
+            <span class="tick" style="left:56%">15</span>
+            <span class="tick" style="left:76%">20</span>
+            <span class="tick" style="left:100%">26</span>
+          </span>
+          <span class="axis-caption">business day of first detection</span>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch-twin"></i> isolated to a single quirk (3)</span>
+        <span><i class="swatch-flag"></i> detected, cause not attributable (9)</span>
+      </div>
+    </div>
+
+    <div class="col" style="display:flex; flex-direction:column; gap:1.5rem">
+      <div class="note note--break">
+        <h3>Reconciliation is a tripwire, not a diagnosis</h3>
+        <p>
+          Every seeded behaviour surfaced, most within the first working week — but only three
+          produced a break signature naming exactly one cause. That is structural rather than a
+          tuning gap: signatures are integer predicates over a delta, and distinct behaviours
+          produce the same delta shape. More rules cannot fix it, because the information needed
+          is not in the delta.
+        </p>
+      </div>
+      <div class="note note--break">
+        <h3>Cadence sizes the window; the calendar places it</h3>
+        <p>
+          A month-end quirk cannot be found before month end, however sensitive the reconciler
+          is. Two <code>month_end</code> quirks behave identically and were found on day 2 and
+          day 25 — because W1 opens on 2028-02-28, so a leap-day month end falls on business
+          day 2 and the next not until day 25. A four-week pilot that happens to sit between two
+          month ends exercises none of that behaviour and reports clean.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">Finding 2</p>
+      <h2>What each delivery design actually costs when the broker dies mid-payday</h2>
+      <p style="margin:0.3rem 0 0">
+        Three Redpanda brokers at replication factor 3, killed and restarted on a
+        quorum-preserving schedule. 36,000 movements per run, three runs per configuration,
+        median with min–max in brackets.
+      </p>
+    </div>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th class="wrapme">Consumer configuration</th>
+            <th>Applied</th>
+            <th>Lost</th>
+            <th>Duplicated</th>
+            <th>Zero-sum invariant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="wrapme cfg">A <em>— at-most-once</em></td>
+            <td class="num">36000 <span class="range">[35975–36000]</span></td>
+            <td class="num bad">0 <span class="range">[0–25]</span></td>
+            <td class="num">0 <span class="range">[0–8472]</span></td>
+            <td class="good">held</td>
+          </tr>
+          <tr>
+            <td class="wrapme cfg">B <em>— at-least-once</em></td>
+            <td class="num">36000</td>
+            <td class="num">0</td>
+            <td class="num bad">4959 <span class="range">[0–8950]</span></td>
+            <td class="good">held</td>
+          </tr>
+          <tr>
+            <td class="wrapme cfg">C <em>— at-least-once + inbox</em></td>
+            <td class="num">36000</td>
+            <td class="num">0</td>
+            <td class="num good">0</td>
+            <td class="good">held</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col" style="display:flex; flex-direction:column; gap:1.5rem">
+      <div class="note note--break">
+        <h3>A did both, and that is the row worth reading twice</h3>
+        <p>
+          At-most-once is the only configuration here that lost anything — 25 movements
+          produced, acknowledged by the cluster, never applied. It also duplicated, because its
+          guarantee holds only while the offset commit survives, and a coordinator failover can
+          lose the commit. It buys “no duplicates” while commits are durable and pays with real
+          loss when they are not: the worst of both outcomes, arrived at honestly.
+        </p>
+      </div>
+      <div class="note note--held">
+        <h3>C duplicated nothing, because suppression is a constraint</h3>
+        <p>
+          A redelivered message collides on <code>inbox_pkey</code> and the whole transaction
+          rolls back. That is a database constraint rather than a race that usually goes the
+          right way — which is why the zero appears in every run rather than most of them.
+        </p>
+      </div>
+      <div class="note note--held">
+        <h3>The invariant held in all nine runs — and that is the point</h3>
+        <p>
+          A duplicated posting is perfectly balanced and completely wrong. Correctness at the
+          row level does not imply correctness at the ledger level, and no internal invariant
+          can close that gap. It is precisely why a second source of truth exists.
+        </p>
+      </div>
+      <div class="note">
+        <h3>Counts for A and B are net, not exact</h3>
+        <p>
+          Neither keeps an inbox, and both mint a fresh posting id per delivery, so nothing
+          records which movement an effect came from: a run that lost 100 and applied 100 others
+          twice is indistinguishable from a clean one. Latency is empty for the same reason.
+          That is not a limitation of the harness — <strong>without an inbox the system is not
+          measurable from its own data.</strong>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">What building it found</p>
+      <h2>Nine defects, and only one of them failed loudly</h2>
+      <p style="margin:0.3rem 0 0">
+        Five sat in a chaos profile that had been written, reviewed and committed six weeks
+        earlier — and never once started. Four more were in the measurement harness itself.
+      </p>
+    </div>
+
+    <div class="ledger">
+      <div class="entry">
+        <p class="label">Chaos profile</p>
+        <h3>Kills that matched nothing</h3>
+        <p>Chaos killed brokers by name; Compose generates <code>&lt;project&gt;-redpanda-1-1</code>. A failed kill is recorded, not fatal — so the sweep would have completed cleanly having killed nothing.</p>
+      </div>
+      <div class="entry">
+        <p class="label">Chaos profile</p>
+        <h3>A property that does not exist</h3>
+        <p><code>unclean_leader_election_enabled</code> is a Kafka name with no Redpanda equivalent. Inert since the day it was written, while the config header advertised the guarantee on its strength.</p>
+      </div>
+      <div class="entry">
+        <p class="label">Chaos profile</p>
+        <h3>Cluster settings applied as node settings</h3>
+        <p>Four properties silently ignored, so the profile claimed RF=3, minimum replication and transactions it did not have. Only one of the five failed loudly; the rest would have produced entirely reasonable numbers.</p>
+      </div>
+      <div class="entry">
+        <p class="label">Harness</p>
+        <h3>122,886 losses that never happened</h3>
+        <p>The drain detector capped <em>total</em> wait rather than stalls, so everything the consumer had not yet reached was recorded as permanent loss — records sitting on the broker, intact. Every fixed parameter agreed, so every guard would have rendered that table.</p>
+      </div>
+      <div class="entry">
+        <p class="label">Harness</p>
+        <h3>44,746 applied against 36,000 sent</h3>
+        <p>Runs were isolated; sweeps were not. Run ids repeat between sweeps, so the second attached to the first sweep’s topics and consumed an experiment already discarded. C exposed it; A and B concealed it as duplication, where it looked like a finding.</p>
+      </div>
+      <div class="entry">
+        <p class="label">Harness</p>
+        <h3>Duplication that was structurally zero</h3>
+        <p>Mode B applied <strong>26,221 effects for 12,000 movements</strong> and reported zero duplicates, because <code>duplicated = postings − applied</code> is identically zero without an inbox.</p>
+      </div>
+    </div>
+
+    <div class="col" style="display:flex; flex-direction:column; gap:1.5rem">
+      <p class="pull">
+        The failures worth guarding against are the ones that produce a
+        <span>plausible number.</span> An exception is easy to notice. A confidently wrong
+        table is what reaches a decision-maker.
+      </p>
+      <div class="note note--held">
+        <h3>So each one became a refusal, not a comment</h3>
+        <p>
+          Seven guards now decline to render a finding rather than render a doubtful one: a
+          table built from an in-process broker, one mixing simulated with real runs, one
+          containing a run cut off mid-drain, one where applied exceeds sent, one folding two
+          sweeps together, one whose rows differ in seed, rate, schedule, SHA or broker version,
+          and one presenting net counts as exact.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">The system</p>
+      <h2>Four components, one gate</h2>
+    </div>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Language</th><th class="wrapme">Responsibility</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">ledger</td><td>Go</td>
+            <td class="wrapme">Double-entry and append-only; balances derived from entries with checkpoints; ledger / available / pending with expiring holds; EOD accrual; idempotency as a database constraint; transactional outbox; a consumer with four swappable delivery modes; a live global-invariant gauge</td>
+          </tr>
+          <tr>
+            <td class="mono">legacy-sim</td><td>Python</td>
+            <td class="wrapme">Deterministic transaction stream and header/detail/trailer EOD extracts, with twelve switchable quirks defined as <em>data</em> in <code>quirks.yaml</code></td>
+          </tr>
+          <tr>
+            <td class="mono">reconcile</td><td>Python</td>
+            <td class="wrapme">Three grains — transaction, account-day, control total — plus timing / model-difference / defect classification, ageing, and per-quirk time-to-discovery</td>
+          </tr>
+          <tr>
+            <td class="mono">harness</td><td>Go</td>
+            <td class="wrapme">Open-model load (payday, month-end, hot keys), scripted broker kills, the A–D ablation runner, and deterministic report rendering</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>
+        One gate: <code>make check</code> — format, lint, <code>mypy --strict</code>,
+        <code>go vet</code>, unit, integration, <code>-race</code>. CI runs the same command and
+        adds nothing to it. Built under a gated, document-first lifecycle: requirements,
+        high-level design, low-level design and a task-level execution plan, each approved
+        before the next began — <strong>no application code exists before the commit that
+        approved the plan</strong>, and the history shows it. Decisions are numbered and
+        append-only, including the ones that turned out to be wrong.
+      </p>
+    </div>
+
+    <dl class="stats">
+      <div class="stat"><dt>Go</dt><dd>10,900<small>lines</small></dd></div>
+      <div class="stat"><dt>Python</dt><dd>4,500<small>lines</small></dd></div>
+      <div class="stat"><dt>Tests</dt><dd>243<small>named to the scenario they cover</small></dd></div>
+      <div class="stat"><dt>Decisions</dt><dd>33<small>append-only, wrong ones included</small></dd></div>
+      <div class="stat"><dt>Migrations</dt><dd>6<small>numbered, forward-only</small></dd></div>
+    </dl>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">Limits</p>
+      <h2>What this does not prove</h2>
+    </div>
+    <div class="caveats">
+      <div class="caveat"><p><b>The quirks are seeded and known.</b> This calibrates a twin’s reconciliation; it does not discover unknown behaviour.</p></div>
+      <div class="caveat"><p><b>A simulator is not a core.</b> A real incumbent has decades of divergences, and they interact in ways this cannot reproduce.</p></div>
+      <div class="caveat"><p><b>Single-box numbers are not production numbers.</b> The throughput target in the requirements was not met on the available hardware, and the ship report says so.</p></div>
+      <div class="caveat"><p><b>Finding 2 ran at 200 movements/s, not the specified 1,000/s</b>, because the consumer sustains ~280/s on that host. Valid as a comparison between configurations under identical chaos; not the specified rate.</p></div>
+      <div class="caveat"><p><b>Configuration D is implemented and has never run.</b> The in-process fake cannot verify transactional producer ids, so only a real cluster can.</p></div>
+      <div class="caveat"><p><b>Quirks compound.</b> Twelve are detected in isolation, eleven with all twelve enabled at once — because some change which transactions land on which business day and destroy the ratios others would show. Both numbers are in the report.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <div class="sec-head col">
+      <p class="label">Reproduce</p>
+      <h2>Two seconds, no containers</h2>
+    </div>
+    <div class="col" style="display:flex; flex-direction:column; gap:1.2rem">
+      <div class="repro"><b>cp</b> .env.example .env
+<b>make</b> doctor      <span style="color:var(--ink-faint)"># says exactly what this machine can and cannot run</span>
+<b>make</b> demo        <span style="color:var(--ink-faint)"># Finding 1, both windows, ~2s</span></div>
+      <p>
+        <code>make demo</code> needs only <code>uv</code>. It regenerates the findings report
+        from a seed, and the same seed produces byte-identical output — asserted by a test,
+        because the per-quirk numbers are only controlled experiments if nothing else moves.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Portfolio work built to production constraints. No real money, no real data, not a
+    production system. The ship report is the honest account of what is and is not measured.
+  </footer>
+
+</div>
