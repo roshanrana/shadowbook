@@ -79,7 +79,7 @@ test tooling — present:
 | A (2–3 rows) | one line | one line |
 
 **Recommendation: <option>** — 2–3 sentences tying the choice to THIS project's
-requirements, the user's stated skills, hiring/ecosystem reality, and operational
+requirements, the user's stated skills, market/ecosystem reality, and operational
 burden. Not a generic "X is popular" argument.
 ```
 

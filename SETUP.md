@@ -67,7 +67,7 @@ Expected cadence: Phase 1–3 in one evening; M0 walking skeleton the next morni
 - One task per session or per parallel agent; task packs define file scope.
 - If `make check` fails twice on a task, stop and read the task file — the two-strike rule is there to prevent the token sink.
 - Commit with the task ID. Push at the end of each wave.
-- When the interview lands: `git tag round-2` at whatever state exists. A truthful "here is exactly how far I got" beats a rushed finish.
+- When the review window lands: `git tag round-2` at whatever state exists. A truthful "here is exactly how far I got" beats a rushed finish.
 
 ## 7. Before the repo goes fully public
 

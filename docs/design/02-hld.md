@@ -371,7 +371,7 @@ None. Balances are derived per read with checkpoints (FR-L4); a cache would be a
 | R2 | Redpanda's transaction semantics differ from Apache Kafka, breaking configuration D | D-002 go/no-go at M0; D is already off the weekend-2 critical path (D-008), so this cannot sink Finding 2 |
 | R3 | Box cannot sustain three brokers + two Postgres + load | D-007 relaxed target; if still short, reduce account count before reducing rate, since rate equality across configs is what the finding depends on |
 | R4 | Quirks all detected on day 1, making Finding 1 trivial | Q4, Q5, Q6, Q12 are calendar-gated by design; validate the cadence spread at M2 and report undetected quirks rather than hiding them |
-| R5 | Time — interview dates are fixed | M0–M4 in weekend 1; `git tag round-2` at whatever state exists; A/B/C alone is a complete Finding 2 |
+| R5 | Time — delivery dates are fixed | M0–M4 in weekend 1; `git tag round-2` at whatever state exists; A/B/C alone is a complete Finding 2 |
 | R6 | Two ingress paths (HTTP for the demo, topic for the ablation) diverge in behaviour | Both land in the same posting service behind one interface; a contract test asserts identical effects for the same input via both paths |
 | R7 | The shadow's documented rules drift from `quirks.yaml`'s `documented:` fields | §5.4 mirror table is diffed against `quirks.yaml` by a test in `make check` |
 

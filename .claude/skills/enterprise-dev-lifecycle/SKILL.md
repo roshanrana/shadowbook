@@ -57,7 +57,7 @@ Work through the phases in order. Each phase names the reference file to read
 **when you reach it** — do not pre-load references for later phases.
 
 ### Phase 0 — Intake & requirements
-Interview the user about: what the system does, who uses it, scale expectations,
+Run intake with the user about: what the system does, who uses it, scale expectations,
 performance/availability targets, security & compliance context (PII? regulated
 industry?), integration points, budget/hosting constraints, team skills, and hard
 deadlines. Ask in **one batched set of numbered questions** — not a drip-feed.
@@ -135,7 +135,7 @@ reality. **Gate:** present the ship report; the user makes the go/no-go call.
 2. **If present:** read it, read `docs/design/04-execution-plan.md`'s task table
    (not the whole document), and resume at the recorded phase/task. Do not re-read
    requirements, HLD, or LLD unless the current task pack points into them.
-3. **If absent:** you are at Phase 0. Start the intake interview.
+3. **If absent:** you are at Phase 0. Start the intake session.
 4. Never begin a session with a repo-wide crawl, `git log` archaeology, or
    re-summarizing the project — `STATE.md` exists precisely so you don't have to.
 

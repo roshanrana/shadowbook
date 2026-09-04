@@ -55,4 +55,4 @@ The project brief is `docs/shadowbook-project-brief.md`. It is Phase 0 input. Wh
 
 ## Owner context
 
-The owner is a senior fintech implementation engineer with deep reconciliation and collateral experience, preparing for a Forward Deployed Engineer interview at a core-banking platform company. Weekend-1 scope (ledger + legacy-sim + reconcile + Finding 1) is the priority. Optimise the plan for a demoable slice first; the harness and Finding 2 follow. Say this explicitly in the execution plan's wave schedule.
+The owner is a senior fintech implementation engineer with deep reconciliation and collateral experience, packaging this work as a customer-facing implementation case study for a core-banking platform context. Weekend-1 scope (ledger + legacy-sim + reconcile + Finding 1) is the priority. Optimise the plan for a demoable slice first; the harness and Finding 2 follow. Say this explicitly in the execution plan's wave schedule.

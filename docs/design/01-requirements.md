@@ -11,7 +11,7 @@ Build a demonstrable digital-twin harness for core-ledger migration that produce
 
 | Actor | Role |
 |---|---|
-| Owner (developer) | Builds, runs, extends; uses findings in interviews and as portfolio evidence |
+| Owner (developer) | Builds, runs, extends; uses findings in technical reviews and as portfolio evidence |
 | Reviewer (senior engineer at a core-banking company) | Clones, runs `make demo`, reads `FINDINGS.md`, inspects code |
 | legacy-sim | Simulated incumbent core; produces transaction stream and EOD extracts with seeded quirks |
 | ledger | Shadow thin ledger; consumes postings, maintains balances, publishes events |
@@ -99,4 +99,4 @@ Real money or data; customer master, product catalogue, channels, cards, lending
 | Box can't sustain 3-node Redpanda + load at target | Relax chaos-run target; keep steady-state target; document |
 | Kafka transactions on Redpanda behave differently from Apache Kafka | Verify early (M0); if unsupported, run D against Apache Kafka in a separate compose profile or document as not-run |
 | Quirks too easy (all detected day 1) | Q4/Q5/Q6/Q12 are calendar-gated by design; validate cadence in M2 |
-| Time — owner has interview dates | Wave plan prioritises M0–M4 for weekend 1; M5–M7 weekend 2; stretch only after |
+| Time — owner has delivery dates | Wave plan prioritises M0–M4 for weekend 1; M5–M7 weekend 2; stretch only after |
