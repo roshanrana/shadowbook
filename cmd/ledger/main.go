@@ -178,15 +178,30 @@ func dialBroker(seeds, group, mode, topic string) (broker.Producer, broker.Consu
 	if err != nil {
 		return nil, nil, "", err
 	}
-	cons, err := broker.NewKafkaConsumer(broker.KafkaConfig{
+	kcfg := broker.KafkaConfig{
 		Seeds: addrs, Group: group, Topics: []string{topic},
 		ClientID: "shadowbook-consumer-" + mode,
-	})
+	}
+
+	// Configuration D commits offsets inside a Kafka transaction; every other
+	// mode uses a plain commit. This is the ONLY structural difference between
+	// D and C -- the effect is still a PostgreSQL write guarded by the inbox,
+	// because no Kafka transaction can enclose a database.
+	var (
+		cons broker.Consumer
+		kind = "kafka"
+	)
+	if consumer.Mode(mode) == consumer.Transactional {
+		cons, err = broker.NewKafkaTransactionalConsumer(kcfg)
+		kind = "kafka+txn"
+	} else {
+		cons, err = broker.NewKafkaConsumer(kcfg)
+	}
 	if err != nil {
 		_ = prod.Close()
 		return nil, nil, "", err
 	}
-	return prod, cons, fmt.Sprintf("kafka %v group=%s", addrs, group), nil
+	return prod, cons, fmt.Sprintf("%s %v group=%s", kind, addrs, group), nil
 }
 
 func envOr(key, fallback string) string {

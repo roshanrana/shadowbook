@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Git SHA | `a751d0c6b85ac6cf95e7251354242cbcbd92499f` |
+| Git SHA | `ed507c8fb40619dd46c02dd95eb9daec2e0f7ef8` |
 | Seed | `20260903` |
 | Windows | W1, W2 |
 | Broker | redpanda v24.3.6 |
@@ -122,16 +122,31 @@ applied 100 others twice is indistinguishable from a clean one. That is not a
 limitation of the harness but the operational consequence of running without an
 inbox — without one, the ledger cannot answer "was this applied twice?" at all.
 
-| Config | Runs | Sent | Applied | Lost | Duplicated | Latency p50/p95/p99 | Drain (s) | Invariant held |
-|---|---|---|---|---|---|---|---|---|
-| A | 3 | 36000 | 36000 [35975–36000] | 0 [0–25] | 0 [0–8472] | not measured | 0.5 [0.5–0.5] | Y |
-| B | 3 | 36000 | 36000 | 0 | 4959 [0–8950] | not measured | 0.5 [0.5–0.5] | Y |
-| C | 3 | 36000 | 36000 | 0 | 0 | not measured | 0.5 [0.5–0.5] | Y |
-End-to-end latency is **not measured** in this run. The harness records what was
-applied, not when, so per-record timings would have to be inferred from commit
-timestamps -- and an inferred number in a latency column is worse than an empty
-one. It is left empty rather than filled with a zero that would read as
-"instantaneous".
+| Config | Runs | Sent | Applied | Lost | Duplicated | Invariant held |
+|---|---|---|---|---|---|---|
+| A | 3 | 36000 | 36000 [35975–36000] | 0 [0–25] | 0 [0–8472] | Y |
+| B | 3 | 36000 | 36000 | 0 | 4959 [0–8950] | Y |
+| C | 3 | 36000 | 36000 | 0 | 0 | Y |
+
+End-to-end latency, produced to committed in PostgreSQL:
+
+| Config | p50 | p95 | p99 |
+|---|---|---|---|
+| A | not measurable | — | — |
+| B | not measurable | — | — |
+| C | not measurable | — | — |
+Latency is measured only where it *can* be. It is the true end-to-end time —
+produced, acknowledged by the cluster, consumed, committed to PostgreSQL —
+obtained by joining the driver's per-record produce time to `inbox.applied_at`.
+Only C and D keep an inbox. A and B mint a fresh posting id per delivery and
+record nothing tying an effect back to a movement, so there is no join to make.
+
+That is the same architectural fact as the net-versus-exact counts above,
+showing up a second time: **without an inbox the system is not measurable from
+its own data.** Not a limitation of the harness — a property of the
+configuration. The alternative would be to infer timings from commit
+timestamps, and an inferred number in a latency column is worse than an empty
+one.
 
 **What the columns say.** Every statement here is derived from the table above
 rather than written beside it, so it cannot drift from the data on a re-run.
@@ -214,7 +229,7 @@ change what the ledger says; they never made it disagree with itself.
 ## Reproduce
 
 ```
-git checkout a751d0c6b85ac6cf95e7251354242cbcbd92499f
+git checkout ed507c8fb40619dd46c02dd95eb9daec2e0f7ef8
 cp .env.example .env
 make up
 make demo          # both windows, Finding 1

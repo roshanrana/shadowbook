@@ -331,7 +331,7 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID, sweep strin
 		chaosDone <- recs
 	}()
 
-	sent, err := r.drive(loadCtx, prod, accounts, topic)
+	sent, sentAt, err := r.drive(loadCtx, prod, accounts, topic)
 	art.Sent = sent
 	if err != nil {
 		return art, err
@@ -366,7 +366,105 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID, sweep strin
 	if err := measure(ctx, st, &art); err != nil {
 		return art, err
 	}
+	if err := measureLatency(ctx, st, &art, sentAt); err != nil {
+		r.logf("run %s: latency not measured: %v", runID, err)
+	}
 	return art, nil
+}
+
+// measureLatency fills the end-to-end percentiles, where they can be measured.
+//
+// The inbox stores applied_at against the message id, and a message id encodes
+// its sequence number, so joining it to the produce time the driver recorded
+// gives a true per-record latency: produced -> acknowledged by the cluster ->
+// consumed -> committed to PostgreSQL.
+//
+// Only configurations C and D have an inbox. A and B mint a fresh posting id
+// per delivery and record nothing that ties an effect back to a movement, so
+// their latency is not measurable for exactly the same reason their loss and
+// duplication counts are net rather than exact. That is not a gap in the
+// harness; it is what running without an inbox costs you, and the report says
+// so rather than filling the column with an inference.
+func measureLatency(ctx context.Context, st *store.Store, art *Artefact, sentAt []time.Time) error {
+	if art.Config != consumer.InboxDedup && art.Config != consumer.Transactional {
+		return nil // no inbox: nothing ties an effect to a movement
+	}
+	if len(sentAt) == 0 {
+		return errors.New("no produce timestamps recorded")
+	}
+
+	rows, err := st.Pool.Query(ctx, `SELECT message_id, applied_at FROM inbox`)
+	if err != nil {
+		return fmt.Errorf("read inbox: %w", err)
+	}
+	defer rows.Close()
+
+	var micros []int64
+	for rows.Next() {
+		var id string
+		var appliedAt time.Time
+		if err := rows.Scan(&id, &appliedAt); err != nil {
+			return err
+		}
+		seq, ok := sequenceOf(id)
+		if !ok || seq < 0 || seq >= int64(len(sentAt)) {
+			continue
+		}
+		produced := sentAt[seq]
+		if produced.IsZero() {
+			continue
+		}
+		d := appliedAt.Sub(produced)
+		if d < 0 {
+			// Negative means the two clocks disagree -- the ledger's PostgreSQL
+			// runs in a container. Dropping it is better than reporting a
+			// negative latency or clamping it to zero, which would quietly bias
+			// the percentiles downward.
+			continue
+		}
+		micros = append(micros, d.Microseconds())
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(micros) == 0 {
+		return errors.New("no inbox rows matched a recorded produce time")
+	}
+
+	sort.Slice(micros, func(i, j int) bool { return micros[i] < micros[j] })
+	art.P50 = percentile(micros, 50)
+	art.P95 = percentile(micros, 95)
+	art.P99 = percentile(micros, 99)
+	return nil
+}
+
+// sequenceOf extracts the sequence number from a message id of the form
+// "mv-<seed>-<seq>".
+func sequenceOf(messageID string) (int64, bool) {
+	i := strings.LastIndex(messageID, "-")
+	if i < 0 || i+1 >= len(messageID) {
+		return 0, false
+	}
+	var n int64
+	if _, err := fmt.Sscanf(messageID[i+1:], "%d", &n); err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// percentile returns the p-th percentile of a SORTED slice, by nearest rank.
+func percentile(sorted []int64, p int) int64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := (p*len(sorted) + 99) / 100 // ceil(p/100 * n)
+	if idx < 1 {
+		idx = 1
+	}
+	if idx > len(sorted) {
+		idx = len(sorted)
+	}
+	return sorted[idx-1]
 }
 
 // drive produces `rate * duration` movement events at a steady rate.
@@ -374,12 +472,16 @@ func (r *Runner) one(ctx context.Context, mode consumer.Mode, runID, sweep strin
 // Open-model: arrivals are placed by the clock, not by when the previous
 // produce returned. A closed-model driver would slow down exactly when the
 // broker was struggling, which is the moment the experiment is about.
-func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uuid.UUID, topic string) (int64, error) {
+func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uuid.UUID, topic string) (int64, []time.Time, error) {
 	const batch = 50
 	total := int64(r.Spec.Rate) * int64(r.Spec.Duration.Seconds())
 	if total <= 0 {
-		return 0, nil
+		return 0, nil, nil
 	}
+	// Wall-clock produce time per sequence number. This is what makes latency
+	// measurable without a schema change: the inbox already records applied_at
+	// per message id, and a message id encodes its sequence.
+	sentAt := make([]time.Time, total)
 	interval := time.Duration(float64(time.Second) / float64(r.Spec.Rate) * batch)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -389,7 +491,7 @@ func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uui
 	for sent < total {
 		select {
 		case <-ctx.Done():
-			return sent, nil
+			return sent, sentAt, nil
 		case <-ticker.C:
 		}
 		n := min(int64(batch), total-sent)
@@ -413,18 +515,22 @@ func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uui
 			}
 			value, err := proto.Marshal(ev)
 			if err != nil {
-				return sent, err
+				return sent, sentAt, err
 			}
 			recs = append(recs, broker.Record{
 				Topic: topic, Key: account.String(), Value: value,
 			})
+		}
+		at := r.now()
+		for i := int64(0); i < n; i++ {
+			sentAt[sent+i] = at
 		}
 		if err := prod.Produce(ctx, recs); err != nil {
 			// A produce that fails during chaos is a fact about the run, not a
 			// reason to abandon it: those records are genuinely not sent, and
 			// `sent` must not count them or Lost would be overstated.
 			if ctx.Err() != nil {
-				return sent, nil
+				return sent, sentAt, nil
 			}
 			// Failing on the very first batch is different in kind. Nothing has
 			// been killed yet, so this is the experiment failing to start --
@@ -432,15 +538,15 @@ func (r *Runner) drive(ctx context.Context, prod broker.Producer, accounts []uui
 			// sent nothing would render as total loss, which is precisely the
 			// result the experiment exists to measure. Surface it instead.
 			if sent == 0 {
-				return 0, fmt.Errorf("ablation: first produce failed, so the run never "+
+				return 0, nil, fmt.Errorf("ablation: first produce failed, so the run never "+
 					"started (this is a setup fault, not a measurement): %w", err)
 			}
 			r.logf("produce failed after %d records: %v", sent, err)
-			return sent, nil
+			return sent, sentAt, nil
 		}
 		sent += n
 	}
-	return sent, nil
+	return sent, sentAt, nil
 }
 
 // waitForDrain blocks until the consumer has finished, and reports whether it

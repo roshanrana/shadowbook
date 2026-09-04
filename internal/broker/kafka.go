@@ -390,3 +390,180 @@ var (
 	_ Producer = (*KafkaProducer)(nil)
 	_ Consumer = (*KafkaConsumer)(nil)
 )
+
+// KafkaTransactionalConsumer is configuration D: offsets are committed inside a
+// Kafka transaction rather than as a plain commit.
+//
+// What this does and does not buy is worth stating precisely, because the name
+// invites over-reading. The transaction makes the OFFSET COMMIT atomic with
+// anything produced in the same session. It does not extend to PostgreSQL: the
+// ledger's effect is a database write, and no Kafka transaction can enclose it.
+// So D is C plus a transactional offset commit, and its exactly-once property
+// still rests on the inbox primary key, exactly as C's does.
+//
+// The difference D does make is at the rebalance boundary. A plain commit that
+// lands during a rebalance can be accepted by a coordinator that is no longer
+// authoritative; the transactional session aborts instead, so the batch is
+// redelivered rather than silently skipped.
+type KafkaTransactionalConsumer struct {
+	sess    *kgo.GroupTransactSession
+	adm     *kadm.Client
+	group   string
+	timeout time.Duration
+
+	inTxn    bool
+	aborted  atomic.Int64
+	dataLoss atomic.Int64
+}
+
+// NewKafkaTransactionalConsumer joins the group with a transactional session.
+func NewKafkaTransactionalConsumer(cfg KafkaConfig) (*KafkaTransactionalConsumer, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+	if cfg.Group == "" {
+		return nil, errors.New("broker: consumer group id is required")
+	}
+	if len(cfg.Topics) == 0 {
+		return nil, errors.New("broker: no topics to consume")
+	}
+	id := cfg.ClientID
+	if id == "" {
+		id = "shadowbook-consumer-d"
+	}
+	sess, err := kgo.NewGroupTransactSession(
+		kgo.SeedBrokers(cfg.Seeds...),
+		kgo.ClientID(id),
+		kgo.ConsumerGroup(cfg.Group),
+		kgo.ConsumeTopics(cfg.Topics...),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+		// The transactional id must be stable for this consumer, or the broker
+		// treats a restart as a different producer and will not fence the old
+		// one -- which is the whole point of the mechanism.
+		kgo.TransactionalID(cfg.Group+"-txn"),
+		kgo.RequireStableFetchOffsets(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("broker: transactional session: %w", err)
+	}
+	timeout := cfg.PollTimeout
+	if timeout <= 0 {
+		timeout = DefaultPollTimeout
+	}
+	return &KafkaTransactionalConsumer{
+		sess: sess, adm: kadm.NewClient(sess.Client()), group: cfg.Group, timeout: timeout,
+	}, nil
+}
+
+// AbortedTransactions counts sessions that ended without committing, which
+// happens when the group rebalanced mid-transaction.
+func (c *KafkaTransactionalConsumer) AbortedTransactions() int64 { return c.aborted.Load() }
+
+// Poll begins a transaction and fetches within it.
+func (c *KafkaTransactionalConsumer) Poll(ctx context.Context, maxRecords int) ([]Record, error) {
+	if !c.inTxn {
+		if err := c.sess.Begin(); err != nil {
+			return nil, fmt.Errorf("%w: begin transaction: %w", ErrTransient, err)
+		}
+		c.inTxn = true
+	}
+
+	pollCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	fetches := c.sess.PollRecords(pollCtx, maxRecords)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	for _, e := range fetches.Errors() {
+		switch {
+		case errors.Is(e.Err, context.DeadlineExceeded), errors.Is(e.Err, context.Canceled):
+			continue
+		case isDataLoss(e.Err):
+			c.dataLoss.Add(1)
+			continue
+		case isRetriable(e.Err):
+			continue
+		default:
+			return nil, fmt.Errorf("broker: fetch %s[%d]: %w", e.Topic, e.Partition, e.Err)
+		}
+	}
+
+	out := make([]Record, 0, fetches.NumRecords())
+	fetches.EachRecord(func(r *kgo.Record) {
+		out = append(out, Record{
+			Topic: r.Topic, Key: string(r.Key), Value: r.Value,
+			Partition: r.Partition, Offset: r.Offset,
+		})
+	})
+
+	// An empty poll must not leave a transaction open across the idle loop: an
+	// open transaction holds the partitions and eventually times out on the
+	// broker, which looks like a stall rather than an idle consumer.
+	if len(out) == 0 {
+		// Abort failures are deliberately ignored: the transaction is being
+		// discarded anyway, and nothing was applied inside it, so there is no
+		// outcome to preserve and nothing a caller could usefully do.
+		_, _ = c.endTxn(ctx, kgo.TryAbort)
+	}
+	return out, nil
+}
+
+// Commit ends the transaction, committing the offsets atomically.
+func (c *KafkaTransactionalConsumer) Commit(ctx context.Context, records []Record) error {
+	if !c.inTxn {
+		return nil
+	}
+	committed, err := c.endTxn(ctx, kgo.TryCommit)
+	if err != nil {
+		return fmt.Errorf("%w: end transaction (%d records): %w", ErrTransient, len(records), err)
+	}
+	if !committed {
+		// Aborted because the group rebalanced. The effects are already in
+		// PostgreSQL and the inbox will suppress them on redelivery, so this is
+		// the designed path, not a failure.
+		c.aborted.Add(1)
+		return fmt.Errorf("%w: transaction aborted by rebalance", ErrTransient)
+	}
+	return nil
+}
+
+func (c *KafkaTransactionalConsumer) endTxn(ctx context.Context, try kgo.TransactionEndTry) (bool, error) {
+	committed, err := c.sess.End(ctx, try)
+	c.inTxn = false
+	return committed, err
+}
+
+// Lag is the committed-offset lag for this group.
+func (c *KafkaTransactionalConsumer) Lag(ctx context.Context) (int64, error) {
+	lags, err := c.adm.Lag(ctx, c.group)
+	if err != nil {
+		return 0, fmt.Errorf("broker: lag: %w", err)
+	}
+	var total int64
+	for _, d := range lags {
+		if d.FetchErr != nil || d.DescribeErr != nil {
+			continue
+		}
+		for _, partitions := range d.Lag {
+			for _, l := range partitions {
+				if l.Lag > 0 {
+					total += l.Lag
+				}
+			}
+		}
+	}
+	return total, nil
+}
+
+// Close ends any open transaction and leaves the group.
+func (c *KafkaTransactionalConsumer) Close() error {
+	if c.inTxn {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, _ = c.endTxn(ctx, kgo.TryAbort)
+		cancel()
+	}
+	c.sess.Close()
+	return nil
+}
+
+var _ Consumer = (*KafkaTransactionalConsumer)(nil)

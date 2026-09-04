@@ -69,7 +69,11 @@ func produce(t *testing.T, seeds []string, n int) {
 }
 
 // pollUntil drains up to want records, giving the group time to join.
-func pollUntil(t *testing.T, c *broker.KafkaConsumer, want int) []broker.Record {
+type poller interface {
+	Poll(ctx context.Context, n int) ([]broker.Record, error)
+}
+
+func pollUntil(t *testing.T, c poller, want int) []broker.Record {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -244,5 +248,59 @@ func TestKafkaPollReturnsEmptyWhenQuiet(t *testing.T) {
 	}
 	if elapsed > 3*time.Second {
 		t.Fatalf("poll on a quiet topic took %s; it should bound itself", elapsed)
+	}
+}
+
+// Configuration D CANNOT be verified against kfake, and this test records that
+// rather than pretending otherwise.
+//
+// kfake implements the transaction request types (AddPartitionsToTxn, EndTxn,
+// TxnOffsetCommit) but not the entry point: its handleInitProducerID returns
+// UNKNOWN_SERVER_ERROR for any request carrying a transactional id, with a
+// literal "TODO: Transactional IDs" above it. So the session cannot begin, and
+// no amount of harness work here would change that.
+//
+// The consequence is stated plainly in the ship report: the transactional
+// consumer is IMPLEMENTED but UNVERIFIED until it runs against a real cluster.
+// A skipped test that says why is worth more than a passing test that exercises
+// a path the broker never took.
+func TestKafkaTransactionalConsumerNeedsARealBroker(t *testing.T) {
+	cl := newCluster(t)
+	seeds := cl.ListenAddrs()
+	produce(t, seeds, 4)
+
+	c, err := broker.NewKafkaTransactionalConsumer(broker.KafkaConfig{
+		Seeds: seeds, Group: "txn-probe", Topics: []string{testTopic},
+	})
+	if err != nil {
+		t.Fatalf("constructing the session should succeed even so: %v", err)
+	}
+	defer func() { _ = c.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err = c.Poll(ctx, 4)
+	if err == nil {
+		t.Fatal("kfake accepted a transactional producer id -- it has gained " +
+			"transaction support, so this test should become a real assertion " +
+			"that D commits offsets transactionally")
+	}
+	if !broker.IsTransient(err) {
+		t.Fatalf("a broker that refuses to start a transaction should surface as "+
+			"transient, not fatal: %v", err)
+	}
+	t.Skip("kfake does not implement transactional producer ids; configuration D " +
+		"is verifiable only against a real cluster")
+}
+
+func TestKafkaTransactionalConsumerValidation(t *testing.T) {
+	if _, err := broker.NewKafkaTransactionalConsumer(broker.KafkaConfig{}); err == nil {
+		t.Fatal("accepted an empty seed list")
+	}
+	if _, err := broker.NewKafkaTransactionalConsumer(broker.KafkaConfig{
+		Seeds: []string{"x:1"},
+	}); err == nil {
+		t.Fatal("accepted an empty group id")
 	}
 }

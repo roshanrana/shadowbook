@@ -239,6 +239,9 @@ def build_context(
         "finding2_runs": finding2_runs,
         "finding2_reason": finding2_reason,
         "finding2_notes": _finding2_notes(finding2) if finding2 else [],
+        "finding2_latency_partial": bool(
+            finding2 and not all(r.get("latency_measured") for r in finding2)
+        ),
         "finding2_kind": finding2_kind,
         "finding2_broker": finding2_broker,
         "finding2_exact": finding2_exact,

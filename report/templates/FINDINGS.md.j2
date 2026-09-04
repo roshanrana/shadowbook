@@ -129,17 +129,32 @@ limitation of the harness but the operational consequence of running without an
 inbox — without one, the ledger cannot answer "was this applied twice?" at all.
 {% endif %}
 
-| Config | Runs | Sent | Applied | Lost | Duplicated | Latency p50/p95/p99 | Drain (s) | Invariant held |
-|---|---|---|---|---|---|---|---|---|
+| Config | Runs | Sent | Applied | Lost | Duplicated | Invariant held |
+|---|---|---|---|---|---|---|
 {% for r in finding2 -%}
-| {{ r.config }} | {{ r.runs }} | {{ r.sent }} | {{ r.applied }} | {{ r.lost }} | {{ r.duplicated }} | {{ (r.p50 ~ " / " ~ r.p95 ~ " / " ~ r.p99) if r.latency_measured else "not measured" }} | {{ r.drain_seconds }} | {{ "Y" if r.invariant_held else "N" }} |
+| {{ r.config }} | {{ r.runs }} | {{ r.sent }} | {{ r.applied }} | {{ r.lost }} | {{ r.duplicated }} | {{ "Y" if r.invariant_held else "N" }} |
 {% endfor %}
-{% if finding2 and not finding2[0].latency_measured %}
-End-to-end latency is **not measured** in this run. The harness records what was
-applied, not when, so per-record timings would have to be inferred from commit
-timestamps -- and an inferred number in a latency column is worse than an empty
-one. It is left empty rather than filled with a zero that would read as
-"instantaneous".
+
+End-to-end latency, produced to committed in PostgreSQL:
+
+| Config | p50 | p95 | p99 |
+|---|---|---|---|
+{% for r in finding2 -%}
+| {{ r.config }} | {{ r.p50 if r.latency_measured else "not measurable" }} | {{ r.p95 if r.latency_measured else "—" }} | {{ r.p99 if r.latency_measured else "—" }} |
+{% endfor %}
+{% if finding2_latency_partial %}
+Latency is measured only where it *can* be. It is the true end-to-end time —
+produced, acknowledged by the cluster, consumed, committed to PostgreSQL —
+obtained by joining the driver's per-record produce time to `inbox.applied_at`.
+Only C and D keep an inbox. A and B mint a fresh posting id per delivery and
+record nothing tying an effect back to a movement, so there is no join to make.
+
+That is the same architectural fact as the net-versus-exact counts above,
+showing up a second time: **without an inbox the system is not measurable from
+its own data.** Not a limitation of the harness — a property of the
+configuration. The alternative would be to infer timings from commit
+timestamps, and an inferred number in a latency column is worse than an empty
+one.
 {% endif %}
 
 **What the columns say.** Every statement here is derived from the table above

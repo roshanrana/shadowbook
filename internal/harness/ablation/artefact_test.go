@@ -243,3 +243,45 @@ func TestTableRefusesRunsThatNeverDrained(t *testing.T) {
 		t.Fatalf("error does not name the cause: %v", err)
 	}
 }
+
+func TestPercentileByNearestRank(t *testing.T) {
+	// Nearest-rank, so p50 of ten values is the fifth, not an interpolation.
+	// Latency percentiles that interpolate between two observed values report
+	// a number nobody measured.
+	s := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	for _, tc := range []struct {
+		p    int
+		want int64
+	}{
+		{50, 5}, {95, 10}, {99, 10}, {1, 1}, {100, 10},
+	} {
+		if got := percentile(s, tc.p); got != tc.want {
+			t.Fatalf("p%d = %d, want %d", tc.p, got, tc.want)
+		}
+	}
+	if got := percentile(nil, 50); got != 0 {
+		t.Fatalf("percentile of nothing = %d, want 0", got)
+	}
+	if got := percentile([]int64{42}, 99); got != 42 {
+		t.Fatalf("single value p99 = %d, want 42", got)
+	}
+}
+
+func TestSequenceOfMessageID(t *testing.T) {
+	for _, tc := range []struct {
+		id   string
+		want int64
+		ok   bool
+	}{
+		{"mv-20260904-0", 0, true},
+		{"mv-20260904-35999", 35999, true},
+		{"mv-20260904-", 0, false},
+		{"nodashes", 0, false},
+		{"mv-20260904-abc", 0, false},
+	} {
+		got, ok := sequenceOf(tc.id)
+		if ok != tc.ok || (ok && got != tc.want) {
+			t.Fatalf("sequenceOf(%q) = %d,%v; want %d,%v", tc.id, got, ok, tc.want, tc.ok)
+		}
+	}
+}
