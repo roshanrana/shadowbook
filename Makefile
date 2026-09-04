@@ -55,7 +55,7 @@ test-race: ## go test -race
 	@$(GO) test -race ./... || { echo "go test -race: FAILED"; exit 1; }
 
 coverage: ## NFR-7 gate: ledger >= 85%, posting path >= 95%, reconcile >= 90%, legacy-sim >= 85%
-	@scripts/coverage.sh
+	@bash scripts/coverage.sh
 	@$(UV) run pytest -q -m "not integration" --cov=reconcile --cov-fail-under=90 \
 		--cov-report=term:skip-covered > /dev/null \
 		|| { echo "coverage: reconcile below 90% (NFR-7)"; exit 1; }
@@ -67,7 +67,7 @@ coverage: ## NFR-7 gate: ledger >= 85%, posting path >= 95%, reconcile >= 90%, l
 ## ---------------------------------------------------------------- run it
 
 demo: ## Both windows, Finding 1, < 5 min. Regenerates reports/FINDINGS.md.
-	@scripts/demo.sh
+	@bash scripts/demo.sh
 
 up: ## Single-broker profile.
 	docker compose --profile single up -d
@@ -85,7 +85,7 @@ perf: ## NFR-1/NFR-2 smoke. Its own gate: a latency assertion inside `check` is 
 	@SHADOWBOOK_LEDGER_DSN="$(LEDGER_DSN)" $(GO) test -tags=perf -count=1 -v -timeout 10m ./internal/ledger/perf/
 
 security: ## Pre-public sweep: secrets, digest pins, dependency audits (T-052)
-	@scripts/security-sweep.sh
+	@bash scripts/security-sweep.sh
 
 preflight: ## Report whether an ablation could run here, and why not if not.
 	@$(GO) run ./cmd/harness preflight
@@ -112,7 +112,7 @@ golden-check: ## Fail if the calendar golden file is stale
 		|| { echo "calendar golden is stale: run 'make golden-calendar'"; exit 1; }
 
 gen-check: ## Fail if gen/ is stale relative to contracts/ (needs protoc)
-	@if command -v protoc >/dev/null; then scripts/check-gen-diff.sh; \
+	@if command -v protoc >/dev/null; then bash scripts/check-gen-diff.sh; \
 	 else echo "gen-check: protoc absent, skipping (CI enforces it)"; fi
 
 .PHONY: help check coverage perf security fmt fmt-check lint typecheck gen-check golden-check golden-calendar preflight test-unit test-integration test-race \
